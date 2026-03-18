@@ -138,9 +138,16 @@ async function handleChatMember(client, clientId, chatMember) {
 
   if (entrou) {
     memberJoined(clientId, user.id, userData);
-    incrementMetric(clientId, "entered");
-    console.log(`[ENTRADA] ${user.first_name} | fbclid:${fbclid || "none"}`);
-    await sendCapiEvent(client, client.events.enteredChannel, { ...userData, fbclid }, { group_title: chat.title });
+
+    // Só dispara evento se o usuário passou pelo bot
+    const passouPeloBot = getVisitor(`tg_${user.id}`);
+    if (passouPeloBot) {
+      incrementMetric(clientId, "entered");
+      console.log(`[ENTRADA RASTREADA] ${user.first_name} | fbclid:${fbclid || "none"}`);
+      await sendCapiEvent(client, client.events.enteredChannel, { ...userData, fbclid }, { group_title: chat.title });
+    } else {
+      console.log(`[ENTRADA IGNORADA] ${user.first_name} | não passou pelo bot`);
+    }
   }
 
   if (saiu) {

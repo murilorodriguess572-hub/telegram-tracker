@@ -48,7 +48,7 @@ const clients = {
 
   // ── CLIENTE 3 ──────────────────────────────────────────────
   "eduarda-teste-3": {
-   name: "Nome do Cliente 3",
+   name: "Eduarda Teste 3",
    botToken:      process.env.EDUARDA3_BOT_TOKEN,
    botUsername:   process.env.EDUARDA3_BOT_USERNAME,
    chatId:        process.env.EDUARDA3_CHAT_ID,
