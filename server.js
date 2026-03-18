@@ -31,7 +31,6 @@ app.get("/health", (req, res) => {
 });
 
 // ── PAGE VIEW DA LP ──────────────────────────────────────────
-// POST /track/:clientId  { visitorId, fbclid, userAgent }
 app.post("/track/:clientId", (req, res) => {
   const { clientId } = req.params;
   const { visitorId, fbclid, userAgent } = req.body;
@@ -48,8 +47,6 @@ app.post("/track/:clientId", (req, res) => {
 });
 
 // ── REDIRECT — botão da LP vai para cá ───────────────────────
-// GET /go/:clientId/:visitorId
-// Registra o clique e redireciona para o bot do Telegram
 app.get("/go/:clientId/:visitorId", (req, res) => {
   const { clientId, visitorId } = req.params;
   const client = clients[clientId];
@@ -80,7 +77,18 @@ async function handleChatMember(client, clientId, chatMember) {
   if (String(chat.id) !== String(client.chatId)) return;
 
   const user = new_chat_member?.user || from;
-  const userData = { telegramId: user.id, username: user.username, firstName: user.first_name };
+
+  // Busca fbclid salvo quando o usuário interagiu com o bot
+  const visitorData = getVisitor(`tg_${user.id}`);
+  const fbclid = visitorData?.fbclid || null;
+
+  const userData = {
+    telegramId: user.id,
+    username: user.username,
+    firstName: user.first_name,
+    fbclid: fbclid, // passa o fbclid para o CAPI
+  };
+
   const oldStatus = old_chat_member?.status;
   const newStatus = new_chat_member?.status;
 
@@ -92,7 +100,7 @@ async function handleChatMember(client, clientId, chatMember) {
 
   if (entrou) {
     incrementMetric(clientId, "entered");
-    console.log(`[ENTRADA] ${user.first_name} (@${user.username || "sem username"})`);
+    console.log(`[ENTRADA] ${user.first_name} (@${user.username || "sem username"}) | fbclid:${fbclid || "none"}`);
     await sendCapiEvent(client, client.events.enteredChannel, userData, { group_title: chat.title });
   }
 
@@ -114,11 +122,13 @@ async function handleBotMessage(client, clientId, message) {
     if (visitorId) {
       const visitor = getVisitor(visitorId);
       if (visitor) {
+        // Associa o telegramId ao fbclid para usar quando entrar no grupo
         saveVisitor(`tg_${user.id}`, { ...visitor, telegramId: user.id });
         console.log(`[BOT] /start | visitor:${visitorId} | fbclid:${visitor.fbclid || "none"}`);
       }
     }
-    // Envia mensagem com link do grupo
+
+    // Envia link do grupo
     const groupLink = client.groupLink;
     if (groupLink) {
       await axios.post(`https://api.telegram.org/bot${client.botToken}/sendMessage`, {
