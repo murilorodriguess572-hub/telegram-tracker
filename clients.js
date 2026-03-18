@@ -7,7 +7,7 @@
 const clients = {
 
   // ── CLIENTE 1 ──────────────────────────────────────────────
-  "EDUARDA-TESTE-1": {
+  "eduarda-teste-1": {
     name: "Eduarda Teste 1",
     botToken:     process.env.EDUARDA1_BOT_TOKEN,
     botUsername:  process.env.EDUARDA1_BOT_USERNAME,   // sem @
@@ -27,7 +27,7 @@ const clients = {
   },
 
   // ── CLIENTE 2 ──────────────────────────────────────────────
-  // "EDUARDA-TESTE-2": {
+  // "eduarda-teste-2": {
   //   name: "Eduarda Teste 2",
   //   botToken:      process.env.EDUARDA2_BOT_TOKEN,
   //   botUsername:   process.env.EDUARDA2_BOT_USERNAME,
@@ -47,7 +47,7 @@ const clients = {
   // },
 
   // ── CLIENTE 3 ──────────────────────────────────────────────
-  // "EDUARDA-TESTE-3": {
+  // "eduarda-teste-3": {
   //   name: "Nome do Cliente 3",
   //   botToken:      process.env.EDUARDA3_BOT_TOKEN,
   //   botUsername:   process.env.EDUARDA3_BOT_USERNAME,
