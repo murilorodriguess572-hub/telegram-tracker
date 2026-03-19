@@ -21,7 +21,7 @@ app.use((req, res, next) => {
 
 const PORT = process.env.PORT || 3000;
 
-// ── DASHBOARD COM FILTRO DE DATA ──────────────────────────────
+// ── DASHBOARD ─────────────────────────────────────────────────
 app.get("/dashboard", async (req, res) => {
   const today = new Date().toISOString().split("T")[0];
   const start = req.query.start || today;
@@ -52,13 +52,12 @@ app.get("/health", (req, res) => {
 app.post("/track/:clientId", async (req, res) => {
   const { clientId } = req.params;
   const { visitorId, fbclid, userAgent } = req.body;
-  const ip = req.headers["x-forwarded-for"]?.split(",")[0] || req.ip;
 
   if (!clients[clientId]) return res.status(404).json({ error: "Cliente não encontrado" });
   if (!visitorId) return res.status(400).json({ error: "visitorId obrigatório" });
 
-  saveVisitor(visitorId, { fbclid, ip, userAgent, clientId });
-  await db.saveEvent(clientId, "pageviews", { fbclid, metadata: { userAgent } });
+  saveVisitor(visitorId, { fbclid, clientId });
+  await db.saveEvent(clientId, "pageviews", { fbclid });
 
   console.log(`[TRACK] PageView | ${clientId} | fbclid:${fbclid || "none"}`);
   res.json({ ok: true });
@@ -71,7 +70,7 @@ app.get("/go/:clientId/:visitorId", async (req, res) => {
   if (!client) return res.status(404).send("Cliente não encontrado");
 
   await db.saveEvent(clientId, "clicks", { metadata: { visitorId } });
-  console.log(`[CLICK] ${clientId} | visitor:${visitorId} → bot`);
+  console.log(`[CLICK] ${clientId} | visitor:${visitorId}`);
   res.redirect(`https://t.me/${client.botUsername}?start=${visitorId}`);
 });
 
@@ -89,19 +88,13 @@ app.get("/bet/:clientId/:telegramId", async (req, res) => {
     : null;
 
   await db.saveEvent(clientId, "betClicks", {
-    telegramId,
-    firstName: member?.first_name,
-    username: member?.username,
-    daysInGroup,
+    telegramId, firstName: member?.first_name,
+    username: member?.username, daysInGroup,
   });
-
-  console.log(`[BET] ${clientId} | TG:${telegramId} | ${daysInGroup}d no grupo`);
 
   if (member) {
     await sendCapiEvent(client, client.events.betClick, {
-      telegramId,
-      username: member.username,
-      firstName: member.first_name,
+      telegramId, username: member.username, firstName: member.first_name,
     }, { days_in_group: daysInGroup });
   }
 
@@ -128,8 +121,6 @@ async function handleChatMember(client, clientId, chatMember) {
 
   const user = new_chat_member?.user || from;
   const userData = { telegramId: user.id, username: user.username, firstName: user.first_name };
-  const visitorData = getVisitor(`tg_${user.id}`);
-  const fbclid = visitorData?.fbclid || null;
 
   const oldStatus = old_chat_member?.status;
   const newStatus = new_chat_member?.status;
@@ -143,13 +134,15 @@ async function handleChatMember(client, clientId, chatMember) {
   if (entrou) {
     await db.saveMemberJoined(clientId, user.id, userData);
 
-    const passouPeloBot = getVisitor(`tg_${user.id}`);
-    if (passouPeloBot) {
+    // Verifica se o usuário passou especificamente por ESTE bot
+    const visitorBot = await db.getVisitorBot(user.id, clientId);
+    if (visitorBot) {
+      const fbclid = visitorBot.fbclid;
       await db.saveEvent(clientId, "entered", { ...userData, fbclid });
-      console.log(`[ENTRADA] ${user.first_name} | fbclid:${fbclid || "none"}`);
+      console.log(`[ENTRADA ✓] ${clientId} | ${user.first_name} | fbclid:${fbclid || "none"}`);
       await sendCapiEvent(client, client.events.enteredChannel, { ...userData, fbclid }, { group_title: chat.title });
     } else {
-      console.log(`[ENTRADA IGNORADA] ${user.first_name} | não passou pelo bot`);
+      console.log(`[ENTRADA IGNORADA] ${clientId} | ${user.first_name} | não usou este bot`);
     }
   }
 
@@ -157,12 +150,11 @@ async function handleChatMember(client, clientId, chatMember) {
     const memberData = await db.saveMemberLeft(clientId, user.id);
     const days = memberData ? parseFloat(memberData.days_in_group) : 0;
     const hotLeadDays = client.hotLeadDays || 3;
-
     const eventType = days < 1 ? "coldLeads" : days >= hotLeadDays ? "hotLeads" : "exited";
-    await db.saveEvent(clientId, eventType, { ...userData, daysInGroup: days });
 
-    console.log(`[SAÍDA] ${user.first_name} | ${days.toFixed(1)} dias | ${eventType}`);
-    await sendCapiEvent(client, client.events.exitedGroup, { ...userData, fbclid }, { days_in_group: days });
+    await db.saveEvent(clientId, eventType, { ...userData, daysInGroup: days });
+    console.log(`[SAÍDA] ${clientId} | ${user.first_name} | ${days.toFixed(1)}d | ${eventType}`);
+    await sendCapiEvent(client, client.events.exitedGroup, userData, { days_in_group: days });
   }
 }
 
@@ -174,17 +166,31 @@ async function handleBotMessage(client, clientId, message) {
 
   if (text.startsWith("/start")) {
     const visitorId = text.split(" ")[1];
+    let fbclid = null;
+
     if (visitorId) {
       const visitor = getVisitor(visitorId);
       if (visitor) {
+        fbclid = visitor.fbclid;
         saveVisitor(`tg_${user.id}`, { ...visitor, telegramId: user.id });
-        console.log(`[BOT] /start | visitor:${visitorId} | fbclid:${visitor.fbclid || "none"}`);
       }
     }
+
+    // Salva no banco: este usuário passou por este bot específico
+    await db.saveVisitorBot(user.id, clientId, fbclid);
+    console.log(`[BOT /start] ${clientId} | TG:${user.id} | fbclid:${fbclid || "none"}`);
+
     if (client.groupLink) {
-      await botSend(client.botToken, user.id,
-        `Olá ${user.first_name}! Clique aqui para entrar no grupo 👇\n${client.groupLink}`
-      );
+      await axios.post(`https://api.telegram.org/bot${client.botToken}/sendMessage`, {
+  chat_id: user.id,
+  text: `Olá ${user.first_name}! Clique no botão abaixo para entrar no grupo 👇`,
+  reply_markup: {
+    inline_keyboard: [[{
+      text: "✅ Entrar no grupo",
+      url: client.groupLink,
+    }]]
+  }
+}).catch(e => console.error("[BOT SEND]", e.message));
     }
     return;
   }
@@ -207,7 +213,6 @@ async function publishExpertMessage(client, clientId, text) {
       }]]
     }
   }).catch(e => console.error("[PUBLISH]", e.message));
-  console.log(`[EXPERT] Mensagem publicada | ${clientId}`);
 }
 
 // ── CLIQUE NO BOTÃO INLINE ────────────────────────────────────
@@ -227,22 +232,16 @@ async function handleCallbackQuery(client, clientId, callbackQuery) {
       : "?";
 
     await db.saveEvent(clientId, "betClicks", {
-      telegramId: from.id,
-      firstName: from.first_name,
-      username: from.username,
-      daysInGroup,
+      telegramId: from.id, firstName: from.first_name,
+      username: from.username, daysInGroup,
     });
-
-    console.log(`[BET CLICK] ${from.first_name} | ${daysInGroup}d no grupo`);
 
     const betLink = `https://telegram-tracker-production.up.railway.app/bet/${clientId}/${from.id}`;
     await botSend(client.botToken, from.id, `Clique aqui para acessar 👇\n${betLink}`);
 
     if (member) {
       await sendCapiEvent(client, client.events.betClick, {
-        telegramId: from.id,
-        username: from.username,
-        firstName: from.first_name,
+        telegramId: from.id, username: from.username, firstName: from.first_name,
       }, { days_in_group: daysInGroup });
     }
   }

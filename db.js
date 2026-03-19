@@ -1,5 +1,4 @@
 // db.js
-// Conexão com PostgreSQL e criação das tabelas
 const { Pool } = require("pg");
 
 const pool = new Pool({
@@ -7,7 +6,6 @@ const pool = new Pool({
   ssl: process.env.DATABASE_URL?.includes("railway") ? { rejectUnauthorized: false } : false,
 });
 
-// Cria as tabelas se não existirem
 async function initDB() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS events (
@@ -36,8 +34,36 @@ async function initDB() {
       clicked_bet_at TIMESTAMPTZ,
       UNIQUE(client_id, telegram_id)
     );
+
+    -- Tabela que registra qual bot o usuário usou para entrar
+    CREATE TABLE IF NOT EXISTS visitor_bot (
+      telegram_id TEXT NOT NULL,
+      client_id TEXT NOT NULL,
+      fbclid TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      PRIMARY KEY (telegram_id, client_id)
+    );
   `);
   console.log("✅ Banco de dados inicializado");
+}
+
+// ── VISITOR BOT — qual bot o usuário usou ────────────────────
+
+async function saveVisitorBot(telegramId, clientId, fbclid) {
+  await pool.query(`
+    INSERT INTO visitor_bot (telegram_id, client_id, fbclid, created_at)
+    VALUES ($1, $2, $3, NOW())
+    ON CONFLICT (telegram_id, client_id)
+    DO UPDATE SET fbclid = $3, created_at = NOW()
+  `, [String(telegramId), clientId, fbclid || null]);
+}
+
+async function getVisitorBot(telegramId, clientId) {
+  const result = await pool.query(`
+    SELECT * FROM visitor_bot
+    WHERE telegram_id = $1 AND client_id = $2
+  `, [String(telegramId), clientId]);
+  return result.rows[0] || null;
 }
 
 // ── EVENTOS ───────────────────────────────────────────────────
@@ -47,8 +73,7 @@ async function saveEvent(clientId, eventType, data = {}) {
     INSERT INTO events (client_id, event_type, telegram_id, username, first_name, fbclid, days_in_group, metadata)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
   `, [
-    clientId,
-    eventType,
+    clientId, eventType,
     data.telegramId || null,
     data.username || null,
     data.firstName || null,
@@ -60,30 +85,22 @@ async function saveEvent(clientId, eventType, data = {}) {
 
 async function getEventCounts(clientId, startDate, endDate) {
   const result = await pool.query(`
-    SELECT
-      event_type,
-      COUNT(*) as count
+    SELECT event_type, COUNT(*) as count
     FROM events
-    WHERE client_id = $1
-      AND created_at >= $2
-      AND created_at <= $3
+    WHERE client_id = $1 AND created_at >= $2 AND created_at <= $3
     GROUP BY event_type
   `, [clientId, startDate, endDate]);
 
   const counts = {};
-  for (const row of result.rows) {
-    counts[row.event_type] = parseInt(row.count);
-  }
+  for (const row of result.rows) counts[row.event_type] = parseInt(row.count);
   return counts;
 }
 
 async function getRecentEvents(clientId, limit = 20) {
   const result = await pool.query(`
     SELECT event_type, first_name, username, fbclid, days_in_group, created_at
-    FROM events
-    WHERE client_id = $1
-    ORDER BY created_at DESC
-    LIMIT $2
+    FROM events WHERE client_id = $1
+    ORDER BY created_at DESC LIMIT $2
   `, [clientId, limit]);
   return result.rows;
 }
@@ -126,8 +143,7 @@ async function getMemberDB(clientId, telegramId) {
 
 async function getActiveMembers(clientId) {
   const result = await pool.query(`
-    SELECT * FROM members
-    WHERE client_id = $1 AND left_at IS NULL
+    SELECT * FROM members WHERE client_id = $1 AND left_at IS NULL
     ORDER BY joined_at DESC
   `, [clientId]);
   return result.rows;
@@ -135,6 +151,7 @@ async function getActiveMembers(clientId) {
 
 module.exports = {
   initDB,
+  saveVisitorBot, getVisitorBot,
   saveEvent, getEventCounts, getRecentEvents,
   saveMemberJoined, saveMemberLeft, saveMemberBetClick, getMemberDB, getActiveMembers,
 };
