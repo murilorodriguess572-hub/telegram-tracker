@@ -188,6 +188,7 @@ async function handleBotMessage(client, clientId, message) {
 
     // Salva no banco: este telegramId usou este bot com este fbclid
     await db.saveVisitorBot(user.id, clientId, fbclid);
+    await db.clearOtherVisitorBots(user.id, clientId);
     console.log(`[BOT /start] ${clientId} | TG:${user.id} | fbclid:${fbclid || "none"}`);
 
     // Envia botão para entrar no grupo

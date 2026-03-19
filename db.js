@@ -173,10 +173,19 @@ async function getActiveMembers(clientId) {
   return result.rows;
 }
 
+async function clearOtherVisitorBots(telegramId, clientId) {
+  await pool.query(
+    `DELETE FROM visitor_bot WHERE telegram_id = $1 AND client_id != $2`,
+    [String(telegramId), clientId]
+  );
+}
+
 module.exports = {
   initDB,
   saveVisitorLP, getVisitorLP,
   saveVisitorBot, getVisitorBot,
   saveEvent, getEventCounts, getRecentEvents,
-  saveMemberJoined, saveMemberLeft, saveMemberBetClick, getMemberDB, getActiveMembers,
+  saveMemberJoined, saveMemberLeft, saveMemberBetClick, getMemberDB, getActiveMembers, clearOtherVisitorBots,
 };
+
+// Adicionar ao final do db.js — antes do module.exports
