@@ -49,6 +49,7 @@ app.get("/health", (req, res) => {
 });
 
 // ── PAGE VIEW DA LP ───────────────────────────────────────────
+// Agora salva o fbclid no banco — não expira com reinício
 app.post("/track/:clientId", async (req, res) => {
   const { clientId } = req.params;
   const { visitorId, fbclid, userAgent } = req.body;
@@ -56,7 +57,9 @@ app.post("/track/:clientId", async (req, res) => {
   if (!clients[clientId]) return res.status(404).json({ error: "Cliente não encontrado" });
   if (!visitorId) return res.status(400).json({ error: "visitorId obrigatório" });
 
+  // Salva em memória (rápido) E no banco (persistente)
   saveVisitor(visitorId, { fbclid, clientId });
+  await db.saveVisitorLP(visitorId, clientId, fbclid);
   await db.saveEvent(clientId, "pageviews", { fbclid });
 
   console.log(`[TRACK] PageView | ${clientId} | fbclid:${fbclid || "none"}`);
@@ -134,7 +137,7 @@ async function handleChatMember(client, clientId, chatMember) {
   if (entrou) {
     await db.saveMemberJoined(clientId, user.id, userData);
 
-    // Verifica se o usuário passou especificamente por ESTE bot
+    // Verifica se o usuário passou por ESTE bot específico (salvo no banco)
     const visitorBot = await db.getVisitorBot(user.id, clientId);
     if (visitorBot) {
       const fbclid = visitorBot.fbclid;
@@ -169,28 +172,36 @@ async function handleBotMessage(client, clientId, message) {
     let fbclid = null;
 
     if (visitorId) {
-      const visitor = getVisitor(visitorId);
-      if (visitor) {
-        fbclid = visitor.fbclid;
-        saveVisitor(`tg_${user.id}`, { ...visitor, telegramId: user.id });
+      // 1. Tenta buscar da memória (mais rápido)
+      const visitorMem = getVisitor(visitorId);
+      if (visitorMem) {
+        fbclid = visitorMem.fbclid;
+      } else {
+        // 2. Se não está em memória (servidor reiniciou), busca do banco
+        const visitorDB = await db.getVisitorLP(visitorId);
+        if (visitorDB) {
+          fbclid = visitorDB.fbclid;
+          console.log(`[BOT] fbclid recuperado do banco | visitor:${visitorId}`);
+        }
       }
     }
 
-    // Salva no banco: este usuário passou por este bot específico
+    // Salva no banco: este telegramId usou este bot com este fbclid
     await db.saveVisitorBot(user.id, clientId, fbclid);
     console.log(`[BOT /start] ${clientId} | TG:${user.id} | fbclid:${fbclid || "none"}`);
 
+    // Envia botão para entrar no grupo
     if (client.groupLink) {
       await axios.post(`https://api.telegram.org/bot${client.botToken}/sendMessage`, {
-  chat_id: user.id,
-  text: `Olá ${user.first_name}! Clique no botão abaixo para entrar no grupo 👇`,
-  reply_markup: {
-    inline_keyboard: [[{
-      text: "✅ Entrar no grupo",
-      url: client.groupLink,
-    }]]
-  }
-}).catch(e => console.error("[BOT SEND]", e.message));
+        chat_id: user.id,
+        text: `Olá ${user.first_name}! Clique no botão abaixo para entrar no grupo 👇`,
+        reply_markup: {
+          inline_keyboard: [[{
+            text: "✅ Entrar no grupo",
+            url: client.groupLink,
+          }]]
+        }
+      }).catch(e => console.error("[BOT SEND]", e.message));
     }
     return;
   }
@@ -237,7 +248,13 @@ async function handleCallbackQuery(client, clientId, callbackQuery) {
     });
 
     const betLink = `https://telegram-tracker-production.up.railway.app/bet/${clientId}/${from.id}`;
-    await botSend(client.botToken, from.id, `Clique aqui para acessar 👇\n${betLink}`);
+    await axios.post(`https://api.telegram.org/bot${client.botToken}/sendMessage`, {
+      chat_id: from.id,
+      text: `Clique abaixo para acessar 👇`,
+      reply_markup: {
+        inline_keyboard: [[{ text: "🎯 Acessar agora", url: betLink }]]
+      }
+    }).catch(e => console.error("[BOT SEND]", e.message));
 
     if (member) {
       await sendCapiEvent(client, client.events.betClick, {
@@ -245,13 +262,6 @@ async function handleCallbackQuery(client, clientId, callbackQuery) {
       }, { days_in_group: daysInGroup });
     }
   }
-}
-
-// ── HELPER ────────────────────────────────────────────────────
-async function botSend(botToken, chatId, text) {
-  await axios.post(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-    chat_id: chatId, text,
-  }).catch(e => console.error("[BOT SEND]", e.message));
 }
 
 // ── INICIALIZAÇÃO ─────────────────────────────────────────────

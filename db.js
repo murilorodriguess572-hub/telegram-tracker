@@ -35,7 +35,6 @@ async function initDB() {
       UNIQUE(client_id, telegram_id)
     );
 
-    -- Tabela que registra qual bot o usuário usou para entrar
     CREATE TABLE IF NOT EXISTS visitor_bot (
       telegram_id TEXT NOT NULL,
       client_id TEXT NOT NULL,
@@ -43,8 +42,34 @@ async function initDB() {
       created_at TIMESTAMPTZ DEFAULT NOW(),
       PRIMARY KEY (telegram_id, client_id)
     );
+
+    -- Salva fbclid da LP persistido no banco (não expira com reinício)
+    CREATE TABLE IF NOT EXISTS visitor_lp (
+      visitor_id TEXT PRIMARY KEY,
+      client_id  TEXT NOT NULL,
+      fbclid     TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
   `);
   console.log("✅ Banco de dados inicializado");
+}
+
+// ── VISITOR LP — salva fbclid da LP no banco ─────────────────
+
+async function saveVisitorLP(visitorId, clientId, fbclid) {
+  await pool.query(`
+    INSERT INTO visitor_lp (visitor_id, client_id, fbclid, created_at)
+    VALUES ($1, $2, $3, NOW())
+    ON CONFLICT (visitor_id)
+    DO UPDATE SET fbclid = $3, created_at = NOW()
+  `, [visitorId, clientId, fbclid || null]);
+}
+
+async function getVisitorLP(visitorId) {
+  const result = await pool.query(`
+    SELECT * FROM visitor_lp WHERE visitor_id = $1
+  `, [visitorId]);
+  return result.rows[0] || null;
 }
 
 // ── VISITOR BOT — qual bot o usuário usou ────────────────────
@@ -54,14 +79,13 @@ async function saveVisitorBot(telegramId, clientId, fbclid) {
     INSERT INTO visitor_bot (telegram_id, client_id, fbclid, created_at)
     VALUES ($1, $2, $3, NOW())
     ON CONFLICT (telegram_id, client_id)
-    DO UPDATE SET fbclid = $3, created_at = NOW()
+    DO UPDATE SET fbclid = COALESCE($3, visitor_bot.fbclid), created_at = NOW()
   `, [String(telegramId), clientId, fbclid || null]);
 }
 
 async function getVisitorBot(telegramId, clientId) {
   const result = await pool.query(`
-    SELECT * FROM visitor_bot
-    WHERE telegram_id = $1 AND client_id = $2
+    SELECT * FROM visitor_bot WHERE telegram_id = $1 AND client_id = $2
   `, [String(telegramId), clientId]);
   return result.rows[0] || null;
 }
@@ -151,6 +175,7 @@ async function getActiveMembers(clientId) {
 
 module.exports = {
   initDB,
+  saveVisitorLP, getVisitorLP,
   saveVisitorBot, getVisitorBot,
   saveEvent, getEventCounts, getRecentEvents,
   saveMemberJoined, saveMemberLeft, saveMemberBetClick, getMemberDB, getActiveMembers,
