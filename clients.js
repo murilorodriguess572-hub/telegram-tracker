@@ -66,6 +66,46 @@ const clients = {
      }
    },
 
+  // ── CLIENTE 3 ──────────────────────────────────────────────
+  "eduarda-teste-4": {
+   name: "Eduarda Teste 4",
+   botToken:      process.env.EDUARDA4_BOT_TOKEN,
+   botUsername:   process.env.EDUARDA4_BOT_USERNAME,
+   chatId:        process.env.EDUARDA4_CHAT_ID,
+   groupLink:     process.env.EDUARDA4_GROUP_LINK,
+   affiliateLink: process.env.EDUARDA4_AFFILIATE_LINK,
+   expertId:      process.env.EDUARDA4_EXPERT_ID,
+   pixelId:       process.env.EDUARDA4_PIXEL_ID,
+   capiToken:     process.env.EDUARDA4_CAPI_TOKEN,
+   pixelTestCode: null,
+   hotLeadDays: 3,
+   events: {
+    enteredChannel: "EnteredChannel4",
+     exitedGroup:    "ExitedGroup4",
+     betClick:       "BetClick4",
+     }
+   },
+   
+  // ── CLIENTE 5 ──────────────────────────────────────────────
+  "eduarda-teste-5": {
+   name: "Eduarda Teste 5",
+   botToken:      process.env.EDUARDA5_BOT_TOKEN,
+   botUsername:   process.env.EDUARDA5_BOT_USERNAME,
+   chatId:        process.env.EDUARDA5_CHAT_ID,
+   groupLink:     process.env.EDUARDA5_GROUP_LINK,
+   affiliateLink: process.env.EDUARDA5_AFFILIATE_LINK,
+   expertId:      process.env.EDUARDA5_EXPERT_ID,
+   pixelId:       process.env.EDUARDA5_PIXEL_ID,
+   capiToken:     process.env.EDUARDA5_CAPI_TOKEN,
+   pixelTestCode: null,
+   hotLeadDays: 3,
+   events: {
+    enteredChannel: "EnteredChannel5",
+     exitedGroup:    "ExitedGroup5",
+     betClick:       "BetClick5",
+     }
+   },
+
 };
 
 module.exports = clients;
