@@ -37,57 +37,91 @@ async function initDB() {
 
     CREATE TABLE IF NOT EXISTS visitor_bot (
       telegram_id TEXT NOT NULL,
-      client_id TEXT NOT NULL,
-      fbclid TEXT,
-      created_at TIMESTAMPTZ DEFAULT NOW(),
+      client_id   TEXT NOT NULL,
+      fbclid      TEXT,
+      created_at  TIMESTAMPTZ DEFAULT NOW(),
       PRIMARY KEY (telegram_id, client_id)
     );
 
-    -- Salva fbclid da LP persistido no banco (não expira com reinício)
     CREATE TABLE IF NOT EXISTS visitor_lp (
-      visitor_id TEXT PRIMARY KEY,
-      client_id  TEXT NOT NULL,
-      fbclid     TEXT,
-      created_at TIMESTAMPTZ DEFAULT NOW()
+      visitor_id  TEXT PRIMARY KEY,
+      client_id   TEXT NOT NULL,
+      fbclid      TEXT,
+      fbp         TEXT,
+      ip          TEXT,
+      user_agent  TEXT,
+      created_at  TIMESTAMPTZ DEFAULT NOW()
     );
+
+    -- Adiciona colunas novas se ainda não existirem (para bancos já criados)
+    ALTER TABLE visitor_lp ADD COLUMN IF NOT EXISTS fbp        TEXT;
+    ALTER TABLE visitor_lp ADD COLUMN IF NOT EXISTS ip         TEXT;
+    ALTER TABLE visitor_lp ADD COLUMN IF NOT EXISTS user_agent TEXT;
+
+    -- Adiciona colunas novas no visitor_bot para enriquecer dados
+    ALTER TABLE visitor_bot ADD COLUMN IF NOT EXISTS fbp        TEXT;
+    ALTER TABLE visitor_bot ADD COLUMN IF NOT EXISTS ip         TEXT;
+    ALTER TABLE visitor_bot ADD COLUMN IF NOT EXISTS user_agent TEXT;
   `);
   console.log("✅ Banco de dados inicializado");
 }
 
-// ── VISITOR LP — salva fbclid da LP no banco ─────────────────
+// ── VISITOR LP ────────────────────────────────────────────────
 
-async function saveVisitorLP(visitorId, clientId, fbclid) {
+async function saveVisitorLP(visitorId, clientId, data = {}) {
   await pool.query(`
-    INSERT INTO visitor_lp (visitor_id, client_id, fbclid, created_at)
-    VALUES ($1, $2, $3, NOW())
+    INSERT INTO visitor_lp (visitor_id, client_id, fbclid, fbp, ip, user_agent, created_at)
+    VALUES ($1, $2, $3, $4, $5, $6, NOW())
     ON CONFLICT (visitor_id)
-    DO UPDATE SET fbclid = $3, created_at = NOW()
-  `, [visitorId, clientId, fbclid || null]);
+    DO UPDATE SET
+      fbclid     = COALESCE($3, visitor_lp.fbclid),
+      fbp        = COALESCE($4, visitor_lp.fbp),
+      ip         = COALESCE($5, visitor_lp.ip),
+      user_agent = COALESCE($6, visitor_lp.user_agent),
+      created_at = NOW()
+  `, [visitorId, clientId, data.fbclid || null, data.fbp || null, data.ip || null, data.userAgent || null]);
 }
 
 async function getVisitorLP(visitorId) {
-  const result = await pool.query(`
-    SELECT * FROM visitor_lp WHERE visitor_id = $1
-  `, [visitorId]);
+  const result = await pool.query(
+    `SELECT * FROM visitor_lp WHERE visitor_id = $1`, [visitorId]
+  );
   return result.rows[0] || null;
 }
 
-// ── VISITOR BOT — qual bot o usuário usou ────────────────────
+// ── VISITOR BOT ───────────────────────────────────────────────
 
-async function saveVisitorBot(telegramId, clientId, fbclid) {
+async function saveVisitorBot(telegramId, clientId, data = {}) {
   await pool.query(`
-    INSERT INTO visitor_bot (telegram_id, client_id, fbclid, created_at)
-    VALUES ($1, $2, $3, NOW())
+    INSERT INTO visitor_bot (telegram_id, client_id, fbclid, fbp, ip, user_agent, created_at)
+    VALUES ($1, $2, $3, $4, $5, $6, NOW())
     ON CONFLICT (telegram_id, client_id)
-    DO UPDATE SET fbclid = COALESCE($3, visitor_bot.fbclid), created_at = NOW()
-  `, [String(telegramId), clientId, fbclid || null]);
+    DO UPDATE SET
+      fbclid     = COALESCE($3, visitor_bot.fbclid),
+      fbp        = COALESCE($4, visitor_bot.fbp),
+      ip         = COALESCE($5, visitor_bot.ip),
+      user_agent = COALESCE($6, visitor_bot.user_agent),
+      created_at = NOW()
+  `, [
+    String(telegramId), clientId,
+    data.fbclid || null, data.fbp || null,
+    data.ip || null, data.userAgent || null,
+  ]);
 }
 
 async function getVisitorBot(telegramId, clientId) {
-  const result = await pool.query(`
-    SELECT * FROM visitor_bot WHERE telegram_id = $1 AND client_id = $2
-  `, [String(telegramId), clientId]);
+  const result = await pool.query(
+    `SELECT * FROM visitor_bot WHERE telegram_id = $1 AND client_id = $2`,
+    [String(telegramId), clientId]
+  );
   return result.rows[0] || null;
+}
+
+async function clearOtherVisitorBots(telegramId, clientId) {
+  await pool.query(
+    `DELETE FROM visitor_bot WHERE telegram_id = $1 AND client_id != $2`,
+    [String(telegramId), clientId]
+  );
 }
 
 // ── EVENTOS ───────────────────────────────────────────────────
@@ -98,12 +132,9 @@ async function saveEvent(clientId, eventType, data = {}) {
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
   `, [
     clientId, eventType,
-    data.telegramId || null,
-    data.username || null,
-    data.firstName || null,
-    data.fbclid || null,
-    data.daysInGroup || null,
-    JSON.stringify(data.metadata || {}),
+    data.telegramId || null, data.username || null,
+    data.firstName || null, data.fbclid || null,
+    data.daysInGroup || null, JSON.stringify(data.metadata || {}),
   ]);
 }
 
@@ -159,9 +190,10 @@ async function saveMemberBetClick(clientId, telegramId) {
 }
 
 async function getMemberDB(clientId, telegramId) {
-  const result = await pool.query(`
-    SELECT * FROM members WHERE client_id = $1 AND telegram_id = $2
-  `, [clientId, telegramId]);
+  const result = await pool.query(
+    `SELECT * FROM members WHERE client_id = $1 AND telegram_id = $2`,
+    [clientId, telegramId]
+  );
   return result.rows[0] || null;
 }
 
@@ -173,19 +205,10 @@ async function getActiveMembers(clientId) {
   return result.rows;
 }
 
-async function clearOtherVisitorBots(telegramId, clientId) {
-  await pool.query(
-    `DELETE FROM visitor_bot WHERE telegram_id = $1 AND client_id != $2`,
-    [String(telegramId), clientId]
-  );
-}
-
 module.exports = {
   initDB,
   saveVisitorLP, getVisitorLP,
-  saveVisitorBot, getVisitorBot,
+  saveVisitorBot, getVisitorBot, clearOtherVisitorBots,
   saveEvent, getEventCounts, getRecentEvents,
-  saveMemberJoined, saveMemberLeft, saveMemberBetClick, getMemberDB, getActiveMembers, clearOtherVisitorBots,
+  saveMemberJoined, saveMemberLeft, saveMemberBetClick, getMemberDB, getActiveMembers,
 };
-
-// Adicionar ao final do db.js — antes do module.exports

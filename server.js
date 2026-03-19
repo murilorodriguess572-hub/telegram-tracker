@@ -26,7 +26,6 @@ app.get("/dashboard", async (req, res) => {
   const today = new Date().toISOString().split("T")[0];
   const start = req.query.start || today;
   const end   = req.query.end   || today;
-
   const startDate = new Date(start + "T00:00:00-03:00");
   const endDate   = new Date(end   + "T23:59:59-03:00");
 
@@ -39,7 +38,6 @@ app.get("/dashboard", async (req, res) => {
     ]);
     clientsData[clientId] = { counts, members, recentEvents };
   }
-
   res.send(renderDashboard(clientsData, clients));
 });
 
@@ -49,20 +47,22 @@ app.get("/health", (req, res) => {
 });
 
 // ── PAGE VIEW DA LP ───────────────────────────────────────────
-// Agora salva o fbclid no banco — não expira com reinício
 app.post("/track/:clientId", async (req, res) => {
   const { clientId } = req.params;
-  const { visitorId, fbclid, userAgent } = req.body;
+  const { visitorId, fbclid, fbp, userAgent } = req.body;
+  const ip = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip;
 
   if (!clients[clientId]) return res.status(404).json({ error: "Cliente não encontrado" });
   if (!visitorId) return res.status(400).json({ error: "visitorId obrigatório" });
 
-  // Salva em memória (rápido) E no banco (persistente)
-  saveVisitor(visitorId, { fbclid, clientId });
-  await db.saveVisitorLP(visitorId, clientId, fbclid);
+  const visitorData = { fbclid, fbp, ip, userAgent, clientId };
+
+  // Salva em memória (rápido) e no banco (persistente)
+  saveVisitor(visitorId, visitorData);
+  await db.saveVisitorLP(visitorId, clientId, visitorData);
   await db.saveEvent(clientId, "pageviews", { fbclid });
 
-  console.log(`[TRACK] PageView | ${clientId} | fbclid:${fbclid || "none"}`);
+  console.log(`[TRACK] PageView | ${clientId} | fbclid:${fbclid || "none"} | fbp:${fbp ? "sim" : "não"}`);
   res.json({ ok: true });
 });
 
@@ -84,6 +84,7 @@ app.get("/bet/:clientId/:telegramId", async (req, res) => {
   if (!client) return res.status(404).send("Cliente não encontrado");
 
   const member = await db.getMemberDB(clientId, telegramId);
+  const visitorBot = await db.getVisitorBot(telegramId, clientId);
   await db.saveMemberBetClick(clientId, telegramId);
 
   const daysInGroup = member
@@ -98,6 +99,8 @@ app.get("/bet/:clientId/:telegramId", async (req, res) => {
   if (member) {
     await sendCapiEvent(client, client.events.betClick, {
       telegramId, username: member.username, firstName: member.first_name,
+      fbclid: visitorBot?.fbclid, fbp: visitorBot?.fbp,
+      ip: visitorBot?.ip, userAgent: visitorBot?.user_agent,
     }, { days_in_group: daysInGroup });
   }
 
@@ -137,13 +140,18 @@ async function handleChatMember(client, clientId, chatMember) {
   if (entrou) {
     await db.saveMemberJoined(clientId, user.id, userData);
 
-    // Verifica se o usuário passou por ESTE bot específico (salvo no banco)
     const visitorBot = await db.getVisitorBot(user.id, clientId);
     if (visitorBot) {
-      const fbclid = visitorBot.fbclid;
-      await db.saveEvent(clientId, "entered", { ...userData, fbclid });
-      console.log(`[ENTRADA ✓] ${clientId} | ${user.first_name} | fbclid:${fbclid || "none"}`);
-      await sendCapiEvent(client, client.events.enteredChannel, { ...userData, fbclid }, { group_title: chat.title });
+      const enriched = {
+        ...userData,
+        fbclid:    visitorBot.fbclid,
+        fbp:       visitorBot.fbp,
+        ip:        visitorBot.ip,
+        userAgent: visitorBot.user_agent,
+      };
+      await db.saveEvent(clientId, "entered", enriched);
+      console.log(`[ENTRADA ✓] ${clientId} | ${user.first_name} | fbclid:${visitorBot.fbclid || "none"} | fbp:${visitorBot.fbp ? "sim" : "não"}`);
+      await sendCapiEvent(client, client.events.enteredChannel, enriched, { group_title: chat.title });
     } else {
       console.log(`[ENTRADA IGNORADA] ${clientId} | ${user.first_name} | não usou este bot`);
     }
@@ -169,45 +177,45 @@ async function handleBotMessage(client, clientId, message) {
 
   if (text.startsWith("/start")) {
     const visitorId = text.split(" ")[1];
-    let fbclid = null;
+    let visitorData = {};
 
     if (visitorId) {
-      // 1. Tenta buscar da memória (mais rápido)
+      // 1. Tenta memória primeiro
       const visitorMem = getVisitor(visitorId);
       if (visitorMem) {
-        fbclid = visitorMem.fbclid;
+        visitorData = visitorMem;
       } else {
-        // 2. Se não está em memória (servidor reiniciou), busca do banco
+        // 2. Busca do banco se servidor reiniciou
         const visitorDB = await db.getVisitorLP(visitorId);
         if (visitorDB) {
-          fbclid = visitorDB.fbclid;
-          console.log(`[BOT] fbclid recuperado do banco | visitor:${visitorId}`);
+          visitorData = {
+            fbclid:    visitorDB.fbclid,
+            fbp:       visitorDB.fbp,
+            ip:        visitorDB.ip,
+            userAgent: visitorDB.user_agent,
+          };
+          console.log(`[BOT] dados recuperados do banco | visitor:${visitorId}`);
         }
       }
     }
 
-    // Salva no banco: este telegramId usou este bot com este fbclid
-    await db.saveVisitorBot(user.id, clientId, fbclid);
+    // Salva no banco com todos os dados enriquecidos
+    await db.saveVisitorBot(user.id, clientId, visitorData);
     await db.clearOtherVisitorBots(user.id, clientId);
-    console.log(`[BOT /start] ${clientId} | TG:${user.id} | fbclid:${fbclid || "none"}`);
+    console.log(`[BOT /start] ${clientId} | TG:${user.id} | fbclid:${visitorData.fbclid || "none"} | fbp:${visitorData.fbp ? "sim" : "não"}`);
 
-    // Envia botão para entrar no grupo
     if (client.groupLink) {
       await axios.post(`https://api.telegram.org/bot${client.botToken}/sendMessage`, {
         chat_id: user.id,
         text: `Olá ${user.first_name}! Clique no botão abaixo para entrar no grupo 👇`,
         reply_markup: {
-          inline_keyboard: [[{
-            text: "✅ Entrar no grupo",
-            url: client.groupLink,
-          }]]
+          inline_keyboard: [[{ text: "✅ Entrar no grupo", url: client.groupLink }]]
         }
       }).catch(e => console.error("[BOT SEND]", e.message));
     }
     return;
   }
 
-  // Mensagem do expert → publica no grupo com botão
   if (String(user.id) === String(client.expertId) && text) {
     await publishExpertMessage(client, clientId, text);
   }
@@ -219,10 +227,7 @@ async function publishExpertMessage(client, clientId, text) {
     chat_id: client.chatId,
     text,
     reply_markup: {
-      inline_keyboard: [[{
-        text: "🎯 Acessar casa de aposta",
-        callback_data: `bet:${clientId}`,
-      }]]
+      inline_keyboard: [[{ text: "🎯 Acessar casa de aposta", callback_data: `bet:${clientId}` }]]
     }
   }).catch(e => console.error("[PUBLISH]", e.message));
 }
@@ -237,6 +242,7 @@ async function handleCallbackQuery(client, clientId, callbackQuery) {
 
   if (data === `bet:${clientId}`) {
     const member = await db.getMemberDB(clientId, from.id);
+    const visitorBot = await db.getVisitorBot(from.id, clientId);
     await db.saveMemberBetClick(clientId, from.id);
 
     const daysInGroup = member
@@ -252,14 +258,14 @@ async function handleCallbackQuery(client, clientId, callbackQuery) {
     await axios.post(`https://api.telegram.org/bot${client.botToken}/sendMessage`, {
       chat_id: from.id,
       text: `Clique abaixo para acessar 👇`,
-      reply_markup: {
-        inline_keyboard: [[{ text: "🎯 Acessar agora", url: betLink }]]
-      }
+      reply_markup: { inline_keyboard: [[{ text: "🎯 Acessar agora", url: betLink }]] }
     }).catch(e => console.error("[BOT SEND]", e.message));
 
     if (member) {
       await sendCapiEvent(client, client.events.betClick, {
         telegramId: from.id, username: from.username, firstName: from.first_name,
+        fbclid: visitorBot?.fbclid, fbp: visitorBot?.fbp,
+        ip: visitorBot?.ip, userAgent: visitorBot?.user_agent,
       }, { days_in_group: daysInGroup });
     }
   }

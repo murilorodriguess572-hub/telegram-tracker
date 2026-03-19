@@ -1,15 +1,22 @@
 // capi.js
 const axios = require("axios");
+const crypto = require("crypto");
 
 const META_API_VERSION = "v19.0";
 const META_CAPI_URL = (pixelId) =>
   `https://graph.facebook.com/${META_API_VERSION}/${pixelId}/events`;
 
+const hash = (val) => val
+  ? crypto.createHash("sha256").update(String(val).trim().toLowerCase()).digest("hex")
+  : undefined;
+
 async function sendCapiEvent(client, eventName, userData = {}, customData = {}) {
   const timestamp = Math.floor(Date.now() / 1000);
-  const crypto = require("crypto");
 
-  const hash = (val) => val ? crypto.createHash("sha256").update(String(val)).digest("hex") : undefined;
+  // Formata fbc a partir do fbclid
+  const fbc = userData.fbclid
+    ? `fb.1.${timestamp}.${userData.fbclid}`
+    : userData.fbc || undefined;
 
   const payload = {
     data: [
@@ -17,15 +24,26 @@ async function sendCapiEvent(client, eventName, userData = {}, customData = {}) 
         event_name: eventName,
         event_time: timestamp,
         action_source: "other",
+
         user_data: {
+          // Identificação
           external_id: hash(userData.telegramId),
-          // fbc é o formato que o Facebook usa para o fbclid
-          fbc: userData.fbclid ? `fb.1.${timestamp}.${userData.fbclid}` : undefined,
+          client_ip_address: userData.ip || undefined,
+          client_user_agent: userData.userAgent || undefined,
+
+          // Atribuição Facebook
+          fbc: fbc,
+          fbp: userData.fbp || undefined,
+
+          // Localização (hasheado)
+          ct:  userData.city    ? hash(userData.city)    : undefined,
+          st:  userData.state   ? hash(userData.state)   : undefined,
+          country: userData.country ? hash(userData.country) : undefined,
         },
+
         custom_data: {
           telegram_user_id: userData.telegramId,
           telegram_username: userData.username || null,
-          telegram_first_name: userData.firstName || null,
           fbclid: userData.fbclid || null,
           ...customData,
         },
@@ -40,7 +58,7 @@ async function sendCapiEvent(client, eventName, userData = {}, customData = {}) 
       headers: { "Content-Type": "application/json" },
     });
 
-    console.log(`[CAPI ✓] ${client.name} → ${eventName} | fbclid:${userData.fbclid || "none"}`);
+    console.log(`[CAPI ✓] ${client.name} → ${eventName} | fbclid:${userData.fbclid || "none"} | fbc:${fbc ? "sim" : "não"} | fbp:${userData.fbp ? "sim" : "não"}`);
     return { success: true, data: response.data };
 
   } catch (error) {
