@@ -1,9 +1,10 @@
 // server.js
 require("dotenv").config();
 const express = require("express");
+const cors = require("cors");
+const path = require("path");
 const axios = require("axios");
 const { sendCapiEvent } = require("./capi");
-const clients = require("./clients");
 const { saveVisitor, getVisitor } = require("./store");
 const { renderDashboard } = require("./dashboard");
 const db = require("./db");
@@ -11,18 +12,49 @@ const { getGeoFromIP } = require("./geo");
 
 const app = express();
 app.use(express.json());
-
-app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  if (req.method === "OPTIONS") return res.sendStatus(200);
-  next();
-});
+app.use(cors({ origin: "*", methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"] }));
 
 const PORT = process.env.PORT || 3000;
 
-// ── DASHBOARD ─────────────────────────────────────────────────
+// ── Clients carregados do banco ───────────────────────────────
+let clientsMap = {};
+
+async function loadClientsFromDB() {
+  const bots = await db.getAllBots();
+  const map = {};
+  for (const bot of bots) {
+    map[bot.slug] = {
+      name:          bot.name,
+      botToken:      bot.bot_token,
+      botUsername:   bot.bot_username,
+      chatId:        bot.chat_id,
+      groupLink:     bot.group_link,
+      affiliateLink: bot.affiliate_link,
+      expertId:      bot.expert_tg_id,
+      pixelId:       bot.pixel_id,
+      capiToken:     bot.capi_token,
+      pixelTestCode: bot.test_code || null,
+      hotLeadDays:   bot.hot_lead_days || 3,
+      events: {
+        enteredChannel: bot.event_entered || "EnteredChannel",
+        exitedGroup:    bot.event_exited  || "ExitedGroup",
+        betClick:       bot.event_bet     || "BetClick",
+      },
+    };
+  }
+  clientsMap = map;
+  console.log(`🔄 Bots carregados do banco: ${Object.keys(map).join(", ") || "(nenhum)"}`);
+}
+
+function getClient(clientId) {
+  return clientsMap[clientId] || null;
+}
+
+// ── API Routes ────────────────────────────────────────────────
+app.use("/api/auth", require("./routes/auth"));
+app.use("/api", require("./routes/api"));
+
+// ── DASHBOARD (legado HTML) ───────────────────────────────────
 app.get("/dashboard", async (req, res) => {
   const today = new Date().toISOString().split("T")[0];
   const start = req.query.start || today;
@@ -31,7 +63,7 @@ app.get("/dashboard", async (req, res) => {
   const endDate   = new Date(end   + "T23:59:59-03:00");
 
   const clientsData = {};
-  for (const clientId of Object.keys(clients)) {
+  for (const clientId of Object.keys(clientsMap)) {
     const [counts, members, recentEvents] = await Promise.all([
       db.getEventCounts(clientId, startDate, endDate),
       db.getActiveMembers(clientId),
@@ -39,12 +71,12 @@ app.get("/dashboard", async (req, res) => {
     ]);
     clientsData[clientId] = { counts, members, recentEvents };
   }
-  res.send(renderDashboard(clientsData, clients));
+  res.send(renderDashboard(clientsData, clientsMap));
 });
 
 // ── HEALTH ────────────────────────────────────────────────────
 app.get("/health", (req, res) => {
-  res.json({ status: "ok", clients: Object.keys(clients), timestamp: new Date().toISOString() });
+  res.json({ status: "ok", bots: Object.keys(clientsMap), timestamp: new Date().toISOString() });
 });
 
 // ── PAGE VIEW DA LP ───────────────────────────────────────────
@@ -53,30 +85,27 @@ app.post("/track/:clientId", async (req, res) => {
   const { visitorId, fbclid, fbp, userAgent } = req.body;
   const ip = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip;
 
-  if (!clients[clientId]) return res.status(404).json({ error: "Cliente não encontrado" });
+  if (!getClient(clientId)) return res.status(404).json({ error: "Cliente não encontrado" });
   if (!visitorId) return res.status(400).json({ error: "visitorId obrigatório" });
 
   const visitorData = { fbclid, fbp, ip, userAgent, clientId };
-
-  // Geolocalização pelo IP
   const geo = await getGeoFromIP(ip);
   if (geo.city) visitorData.city = geo.city;
   if (geo.state) visitorData.state = geo.state;
   if (geo.country) visitorData.country = geo.country;
 
-  // Salva em memória (rápido) e no banco (persistente)
   saveVisitor(visitorId, visitorData);
   await db.saveVisitorLP(visitorId, clientId, visitorData);
   await db.saveEvent(clientId, "pageviews", { fbclid });
 
-  console.log(`[TRACK] PageView | ${clientId} | fbclid:${fbclid || "none"} | fbp:${fbp ? "sim" : "não"}`);
+  console.log(`[TRACK] PageView | ${clientId} | fbclid:${fbclid || "none"}`);
   res.json({ ok: true });
 });
 
 // ── REDIRECT DO BOTÃO DA LP ───────────────────────────────────
 app.get("/go/:clientId/:visitorId", async (req, res) => {
   const { clientId, visitorId } = req.params;
-  const client = clients[clientId];
+  const client = getClient(clientId);
   if (!client) return res.status(404).send("Cliente não encontrado");
 
   await db.saveEvent(clientId, "clicks", { metadata: { visitorId } });
@@ -87,7 +116,7 @@ app.get("/go/:clientId/:visitorId", async (req, res) => {
 // ── LINK DA CASA DE APOSTA ────────────────────────────────────
 app.get("/bet/:clientId/:telegramId", async (req, res) => {
   const { clientId, telegramId } = req.params;
-  const client = clients[clientId];
+  const client = getClient(clientId);
   if (!client) return res.status(404).send("Cliente não encontrado");
 
   const member = await db.getMemberDB(clientId, telegramId);
@@ -120,7 +149,7 @@ app.post("/webhook/:clientId", async (req, res) => {
   res.sendStatus(200);
   const { clientId } = req.params;
   const update = req.body;
-  const client = clients[clientId];
+  const client = getClient(clientId);
   if (!client) return;
 
   if (update.chat_member)    await handleChatMember(client, clientId, update.chat_member);
@@ -147,21 +176,16 @@ async function handleChatMember(client, clientId, chatMember) {
 
   if (entrou) {
     await db.saveMemberJoined(clientId, user.id, userData);
-
     const visitorBot = await db.getVisitorBot(user.id, clientId);
     if (visitorBot) {
       const enriched = {
         ...userData,
-        fbclid:    visitorBot.fbclid,
-        fbp:       visitorBot.fbp,
-        ip:        visitorBot.ip,
-        userAgent: visitorBot.user_agent,
-        city:      visitorBot.city,
-        state:     visitorBot.state,
-        country:   visitorBot.country,
+        fbclid: visitorBot.fbclid, fbp: visitorBot.fbp,
+        ip: visitorBot.ip, userAgent: visitorBot.user_agent,
+        city: visitorBot.city, state: visitorBot.state, country: visitorBot.country,
       };
       await db.saveEvent(clientId, "entered", enriched);
-      console.log(`[ENTRADA ✓] ${clientId} | ${user.first_name} | fbclid:${visitorBot.fbclid || "none"} | fbp:${visitorBot.fbp ? "sim" : "não"}`);
+      console.log(`[ENTRADA ✅] ${clientId} | ${user.first_name} | fbclid:${visitorBot.fbclid || "none"}`);
       await sendCapiEvent(client, client.events.enteredChannel, enriched, { group_title: chat.title });
     } else {
       console.log(`[ENTRADA IGNORADA] ${clientId} | ${user.first_name} | não usou este bot`);
@@ -191,37 +215,26 @@ async function handleBotMessage(client, clientId, message) {
     let visitorData = {};
 
     if (visitorId) {
-      // 1. Tenta memória primeiro
       const visitorMem = getVisitor(visitorId);
       if (visitorMem) {
         visitorData = visitorMem;
       } else {
-        // 2. Busca do banco se servidor reiniciou
         const visitorDB = await db.getVisitorLP(visitorId);
         if (visitorDB) {
-          visitorData = {
-            fbclid:    visitorDB.fbclid,
-            fbp:       visitorDB.fbp,
-            ip:        visitorDB.ip,
-            userAgent: visitorDB.user_agent,
-          };
-          console.log(`[BOT] dados recuperados do banco | visitor:${visitorId}`);
+          visitorData = { fbclid: visitorDB.fbclid, fbp: visitorDB.fbp, ip: visitorDB.ip, userAgent: visitorDB.user_agent };
         }
       }
     }
 
-    // Salva no banco com todos os dados enriquecidos
     await db.saveVisitorBot(user.id, clientId, visitorData);
     await db.clearOtherVisitorBots(user.id, clientId);
-    console.log(`[BOT /start] ${clientId} | TG:${user.id} | fbclid:${visitorData.fbclid || "none"} | fbp:${visitorData.fbp ? "sim" : "não"} | cidade:${visitorData.city || "none"}`);
+    console.log(`[BOT /start] ${clientId} | TG:${user.id} | fbclid:${visitorData.fbclid || "none"}`);
 
     if (client.groupLink) {
       await axios.post(`https://api.telegram.org/bot${client.botToken}/sendMessage`, {
         chat_id: user.id,
         text: `Olá ${user.first_name}! Clique no botão abaixo para entrar no grupo 👇`,
-        reply_markup: {
-          inline_keyboard: [[{ text: "✅ Entrar no grupo", url: client.groupLink }]]
-        }
+        reply_markup: { inline_keyboard: [[{ text: "✅ Entrar no grupo", url: client.groupLink }]] }
       }).catch(e => console.error("[BOT SEND]", e.message));
     }
     return;
@@ -265,7 +278,8 @@ async function handleCallbackQuery(client, clientId, callbackQuery) {
       username: from.username, daysInGroup,
     });
 
-    const betLink = `https://telegram-tracker-production.up.railway.app/bet/${clientId}/${from.id}`;
+    const appUrl = process.env.APP_URL || "https://telegram-tracker-production.up.railway.app";
+    const betLink = `${appUrl}/bet/${clientId}/${from.id}`;
     await axios.post(`https://api.telegram.org/bot${client.botToken}/sendMessage`, {
       chat_id: from.id,
       text: `Clique abaixo para acessar 👇`,
@@ -282,12 +296,22 @@ async function handleCallbackQuery(client, clientId, callbackQuery) {
   }
 }
 
+// ── Serve React frontend em produção ─────────────────────────
+const frontendDist = path.join(__dirname, "frontend", "dist");
+app.use(express.static(frontendDist));
+app.get("*", (req, res) => {
+  res.sendFile(path.join(frontendDist, "index.html"), (err) => {
+    if (err) res.status(200).send("Frontend não compilado. Execute: cd frontend && npm run build");
+  });
+});
+
 // ── INICIALIZAÇÃO ─────────────────────────────────────────────
 (async () => {
   await db.initDB();
+  await loadClientsFromDB();
   app.listen(PORT, () => {
     console.log(`\n✅ Servidor rodando na porta ${PORT}`);
-    console.log(`📊 Dashboard: /dashboard`);
-    console.log(`📋 Clientes: ${Object.keys(clients).join(", ")}\n`);
+    console.log(`📊 Dashboard legado: /dashboard`);
+    console.log(`🔑 API: /api/auth/login\n`);
   });
 })();
