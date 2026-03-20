@@ -53,15 +53,19 @@ async function initDB() {
       created_at  TIMESTAMPTZ DEFAULT NOW()
     );
 
-    -- Adiciona colunas novas se ainda não existirem (para bancos já criados)
     ALTER TABLE visitor_lp ADD COLUMN IF NOT EXISTS fbp        TEXT;
     ALTER TABLE visitor_lp ADD COLUMN IF NOT EXISTS ip         TEXT;
     ALTER TABLE visitor_lp ADD COLUMN IF NOT EXISTS user_agent TEXT;
+    ALTER TABLE visitor_lp ADD COLUMN IF NOT EXISTS city       TEXT;
+    ALTER TABLE visitor_lp ADD COLUMN IF NOT EXISTS state      TEXT;
+    ALTER TABLE visitor_lp ADD COLUMN IF NOT EXISTS country    TEXT;
 
-    -- Adiciona colunas novas no visitor_bot para enriquecer dados
     ALTER TABLE visitor_bot ADD COLUMN IF NOT EXISTS fbp        TEXT;
     ALTER TABLE visitor_bot ADD COLUMN IF NOT EXISTS ip         TEXT;
     ALTER TABLE visitor_bot ADD COLUMN IF NOT EXISTS user_agent TEXT;
+    ALTER TABLE visitor_bot ADD COLUMN IF NOT EXISTS city       TEXT;
+    ALTER TABLE visitor_bot ADD COLUMN IF NOT EXISTS state      TEXT;
+    ALTER TABLE visitor_bot ADD COLUMN IF NOT EXISTS country    TEXT;
   `);
   console.log("✅ Banco de dados inicializado");
 }
@@ -70,16 +74,19 @@ async function initDB() {
 
 async function saveVisitorLP(visitorId, clientId, data = {}) {
   await pool.query(`
-    INSERT INTO visitor_lp (visitor_id, client_id, fbclid, fbp, ip, user_agent, created_at)
-    VALUES ($1, $2, $3, $4, $5, $6, NOW())
+    INSERT INTO visitor_lp (visitor_id, client_id, fbclid, fbp, ip, user_agent, city, state, country, created_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
     ON CONFLICT (visitor_id)
     DO UPDATE SET
       fbclid     = COALESCE($3, visitor_lp.fbclid),
       fbp        = COALESCE($4, visitor_lp.fbp),
       ip         = COALESCE($5, visitor_lp.ip),
       user_agent = COALESCE($6, visitor_lp.user_agent),
+      city       = COALESCE($7, visitor_lp.city),
+      state      = COALESCE($8, visitor_lp.state),
+      country    = COALESCE($9, visitor_lp.country),
       created_at = NOW()
-  `, [visitorId, clientId, data.fbclid || null, data.fbp || null, data.ip || null, data.userAgent || null]);
+  `, [visitorId, clientId, data.fbclid || null, data.fbp || null, data.ip || null, data.userAgent || null, data.city || null, data.state || null, data.country || null]);
 }
 
 async function getVisitorLP(visitorId) {
@@ -93,19 +100,23 @@ async function getVisitorLP(visitorId) {
 
 async function saveVisitorBot(telegramId, clientId, data = {}) {
   await pool.query(`
-    INSERT INTO visitor_bot (telegram_id, client_id, fbclid, fbp, ip, user_agent, created_at)
-    VALUES ($1, $2, $3, $4, $5, $6, NOW())
+    INSERT INTO visitor_bot (telegram_id, client_id, fbclid, fbp, ip, user_agent, city, state, country, created_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
     ON CONFLICT (telegram_id, client_id)
     DO UPDATE SET
       fbclid     = COALESCE($3, visitor_bot.fbclid),
       fbp        = COALESCE($4, visitor_bot.fbp),
       ip         = COALESCE($5, visitor_bot.ip),
       user_agent = COALESCE($6, visitor_bot.user_agent),
+      city       = COALESCE($7, visitor_bot.city),
+      state      = COALESCE($8, visitor_bot.state),
+      country    = COALESCE($9, visitor_bot.country),
       created_at = NOW()
   `, [
     String(telegramId), clientId,
     data.fbclid || null, data.fbp || null,
     data.ip || null, data.userAgent || null,
+    data.city || null, data.state || null, data.country || null,
   ]);
 }
 

@@ -7,6 +7,7 @@ const clients = require("./clients");
 const { saveVisitor, getVisitor } = require("./store");
 const { renderDashboard } = require("./dashboard");
 const db = require("./db");
+const { getGeoFromIP } = require("./geo");
 
 const app = express();
 app.use(express.json());
@@ -57,6 +58,12 @@ app.post("/track/:clientId", async (req, res) => {
 
   const visitorData = { fbclid, fbp, ip, userAgent, clientId };
 
+  // Geolocalização pelo IP
+  const geo = await getGeoFromIP(ip);
+  if (geo.city) visitorData.city = geo.city;
+  if (geo.state) visitorData.state = geo.state;
+  if (geo.country) visitorData.country = geo.country;
+
   // Salva em memória (rápido) e no banco (persistente)
   saveVisitor(visitorId, visitorData);
   await db.saveVisitorLP(visitorId, clientId, visitorData);
@@ -101,6 +108,7 @@ app.get("/bet/:clientId/:telegramId", async (req, res) => {
       telegramId, username: member.username, firstName: member.first_name,
       fbclid: visitorBot?.fbclid, fbp: visitorBot?.fbp,
       ip: visitorBot?.ip, userAgent: visitorBot?.user_agent,
+      city: visitorBot?.city, state: visitorBot?.state, country: visitorBot?.country,
     }, { days_in_group: daysInGroup });
   }
 
@@ -148,6 +156,9 @@ async function handleChatMember(client, clientId, chatMember) {
         fbp:       visitorBot.fbp,
         ip:        visitorBot.ip,
         userAgent: visitorBot.user_agent,
+        city:      visitorBot.city,
+        state:     visitorBot.state,
+        country:   visitorBot.country,
       };
       await db.saveEvent(clientId, "entered", enriched);
       console.log(`[ENTRADA ✓] ${clientId} | ${user.first_name} | fbclid:${visitorBot.fbclid || "none"} | fbp:${visitorBot.fbp ? "sim" : "não"}`);
@@ -202,7 +213,7 @@ async function handleBotMessage(client, clientId, message) {
     // Salva no banco com todos os dados enriquecidos
     await db.saveVisitorBot(user.id, clientId, visitorData);
     await db.clearOtherVisitorBots(user.id, clientId);
-    console.log(`[BOT /start] ${clientId} | TG:${user.id} | fbclid:${visitorData.fbclid || "none"} | fbp:${visitorData.fbp ? "sim" : "não"}`);
+    console.log(`[BOT /start] ${clientId} | TG:${user.id} | fbclid:${visitorData.fbclid || "none"} | fbp:${visitorData.fbp ? "sim" : "não"} | cidade:${visitorData.city || "none"}`);
 
     if (client.groupLink) {
       await axios.post(`https://api.telegram.org/bot${client.botToken}/sendMessage`, {
