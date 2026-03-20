@@ -84,17 +84,19 @@ export default function Overview() {
     setLoading(true)
     setChartLoad(true)
     try {
-      const [overview, allBots] = await Promise.all([
-        api.get(`/metrics/overview?start=${dateRange.start}&end=${dateRange.end}`),
-        api.get('/bots'),
-      ])
+      const overview = await api.get(`/metrics/overview?start=${dateRange.start}&end=${dateRange.end}`)
       setData(overview)
+      setChartLoad(false)
 
-      // Gráfico com dados reais dos últimos 7 dias
-      if (allBots?.length) {
-        const ld = await fetchLineData(allBots, 7)
-        setLineData(ld)
-      }
+      // Só busca gráfico se houver bots
+      try {
+        const allBots = await api.get('/bots')
+        if (allBots?.length) {
+          setChartLoad(true)
+          const ld = await fetchLineData(allBots, 7)
+          setLineData(ld)
+        }
+      } catch {}
     } catch (e) { console.error(e) }
     finally { setLoading(false); setChartLoad(false) }
   }, [dateRange])
@@ -135,32 +137,37 @@ export default function Overview() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
           {/* Gráfico linha */}
-          <div className="lg:col-span-2 rounded-xl overflow-hidden" style={{ background: '#111', border: '1px solid #1a1a1a' }}>
-            <div className="px-6 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid #1a1a1a' }}>
-              <div>
-                <p className="text-white font-semibold text-sm">Entradas por dia</p>
-                <p className="text-gray-600 text-xs mt-0.5">Todos os bots · últimos 7 dias</p>
-              </div>
-              <span className="text-xs font-medium px-2.5 py-1 rounded-full" style={{ background: 'rgba(255,215,0,0.1)', color: '#FFD700' }}>
-                7 dias
-              </span>
-            </div>
-            <div className="px-4 pb-4 pt-2">
-              {chartLoad ? (
-                <div className="rounded-lg skeleton" style={{ height: 200 }} />
-              ) : lineData.every(d => d.total === 0) ? (
-                <div className="flex items-center justify-center" style={{ height: 200 }}>
-                  <p className="text-gray-600 text-sm">Nenhuma entrada nos últimos 7 dias</p>
+          {lineData.length > 0 ? (
+            <div className="lg:col-span-2 rounded-xl overflow-hidden" style={{ background: '#111', border: '1px solid #1a1a1a' }}>
+              <div className="px-6 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid #1a1a1a' }}>
+                <div>
+                  <p className="text-white font-semibold text-sm">Entradas por dia</p>
+                  <p className="text-gray-600 text-xs mt-0.5">Todos os bots · últimos 7 dias</p>
                 </div>
-              ) : (
-                <LineChart
-                  data={lineData}
-                  lines={[{ dataKey: 'total', name: 'Entradas', color: '#FFD700' }]}
-                  height={200}
-                />
-              )}
+              </div>
+              <div className="px-4 pb-4 pt-2">
+                {chartLoad ? (
+                  <div className="rounded-lg skeleton" style={{ height: 200 }} />
+                ) : (
+                  <LineChart data={lineData} lines={[{ dataKey: 'total', name: 'Entradas', color: '#FFD700' }]} height={200} />
+                )}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="lg:col-span-2 rounded-xl flex flex-col items-center justify-center gap-3 p-10"
+              style={{ background: '#111', border: '1px solid #1a1a1a', minHeight: 260 }}>
+              <div style={{ width: 48, height: 48, borderRadius: 14, background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <TrendingUp size={22} style={{ color: '#FFD700' }} />
+              </div>
+              <p className="text-white font-semibold text-sm">Nenhum dado ainda</p>
+              <p className="text-gray-500 text-xs text-center" style={{ maxWidth: 260 }}>
+                Configure bots nos seus clientes para começar a ver entradas por dia aqui.
+              </p>
+              <a href="/settings" style={{ marginTop: 4, background: '#FFD700', color: '#000', fontWeight: 700, fontSize: 12, padding: '8px 20px', borderRadius: 8, textDecoration: 'none' }}>
+                Ir para Configurações
+              </a>
+            </div>
+          )}
 
           {/* Resumo lateral */}
           <div className="rounded-xl overflow-hidden" style={{ background: '#111', border: '1px solid #1a1a1a' }}>
