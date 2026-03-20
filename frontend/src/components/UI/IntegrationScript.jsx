@@ -5,64 +5,8 @@ export default function IntegrationScript({ botSlug, appUrl }) {
   const [copied, setCopied] = useState(false)
   const [open, setOpen] = useState(false)
 
-  const url = appUrl || 'https://telegram-tracker-production.up.railway.app'
-
-  const script = `<script>
-(function () {
-  var BACKEND = "${url}";
-  var CLIENT  = "${botSlug}";
-
-  function getVisitorId() {
-    var id = localStorage.getItem("_tid");
-    if (!id) {
-      id = "v" + Math.random().toString(36).substr(2, 8) + Date.now();
-      localStorage.setItem("_tid", id);
-    }
-    return id;
-  }
-
-  function getFbclid() {
-    var fb = new URLSearchParams(location.search).get("fbclid");
-    if (fb) localStorage.setItem("_fbc", fb);
-    return localStorage.getItem("_fbc");
-  }
-
-  function getFbp() {
-    var match = document.cookie.match(/(^|;)\\s*_fbp=([^;]+)/);
-    return match ? match[2] : null;
-  }
-
-  var vid    = getVisitorId();
-  var fbclid = getFbclid();
-
-  setTimeout(function () {
-    var fbp = getFbp();
-    fetch(BACKEND + "/track/" + CLIENT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        visitorId: vid,
-        fbclid:    fbclid,
-        fbp:       fbp,
-        userAgent: navigator.userAgent,
-      })
-    }).catch(function () {});
-  }, 1500);
-
-  function patchButtons() {
-    document.querySelectorAll('a[href*="t.me"], a[href*="telegram.me"]').forEach(function (btn) {
-      btn.href   = BACKEND + "/go/" + CLIENT + "/" + vid;
-      btn.target = "_blank";
-    });
-  }
-
-  document.readyState === "loading"
-    ? document.addEventListener("DOMContentLoaded", patchButtons)
-    : patchButtons();
-
-  setTimeout(patchButtons, 2000);
-})();
-<\/script>`
+  const url = appUrl || window.location.origin
+  const script = `<script src="${url}/script/${botSlug}.js" async><\/script>`
 
   const copy = () => {
     navigator.clipboard.writeText(script)

@@ -297,6 +297,65 @@ async function handleCallbackQuery(client, clientId, callbackQuery) {
   }
 }
 
+// ── Script de integração dinâmico ────────────────────────────
+app.get("/script/:clientId.js", (req, res) => {
+  const { clientId } = req.params;
+  const appUrl = process.env.APP_URL || `https://${req.headers.host}`;
+
+  res.setHeader("Content-Type", "application/javascript");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+
+  res.send(`(function () {
+  var BACKEND = "${appUrl}";
+  var CLIENT  = "${clientId}";
+
+  function getVisitorId() {
+    var id = localStorage.getItem("_tid");
+    if (!id) {
+      id = "v" + Math.random().toString(36).substr(2, 8) + Date.now();
+      localStorage.setItem("_tid", id);
+    }
+    return id;
+  }
+
+  function getFbclid() {
+    var fb = new URLSearchParams(location.search).get("fbclid");
+    if (fb) localStorage.setItem("_fbc", fb);
+    return localStorage.getItem("_fbc");
+  }
+
+  function getFbp() {
+    var match = document.cookie.match(/(^|;)\\s*_fbp=([^;]+)/);
+    return match ? match[2] : null;
+  }
+
+  var vid    = getVisitorId();
+  var fbclid = getFbclid();
+
+  setTimeout(function () {
+    fetch(BACKEND + "/track/" + CLIENT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ visitorId: vid, fbclid: fbclid, fbp: getFbp(), userAgent: navigator.userAgent })
+    }).catch(function () {});
+  }, 1500);
+
+  function patchButtons() {
+    document.querySelectorAll('a[href*="t.me"], a[href*="telegram.me"]').forEach(function (btn) {
+      btn.href = BACKEND + "/go/" + CLIENT + "/" + vid;
+      btn.target = "_blank";
+    });
+  }
+
+  document.readyState === "loading"
+    ? document.addEventListener("DOMContentLoaded", patchButtons)
+    : patchButtons();
+
+  setTimeout(patchButtons, 2000);
+})();`);
+});
+
 // ── Serve React frontend em produção ─────────────────────────
 const frontendDist = path.join(__dirname, "frontend", "dist");
 app.use(express.static(frontendDist));
