@@ -15,7 +15,10 @@ export default function IntegrationScript({ botSlug, appUrl }) {
   }
 
   return (
-    <div style={{ marginTop: 16, border: '1px solid #1e1e1e', borderRadius: 12, overflow: 'hidden', background: '#0d0d0d' }}>
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{ marginTop: 16, border: '1px solid #1e1e1e', borderRadius: 12, overflow: 'hidden', background: '#0d0d0d' }}
+    >
       <button
         onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
         style={{
