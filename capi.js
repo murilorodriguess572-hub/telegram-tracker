@@ -23,6 +23,7 @@ async function sendCapiEvent(client, eventName, userData = {}, customData = {}) 
       {
         event_name: eventName,
         event_time: timestamp,
+        event_id: crypto.randomUUID(),
         action_source: "other",
 
         user_data: {
