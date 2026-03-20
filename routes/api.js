@@ -27,16 +27,69 @@ router.get("/clients", async (req, res) => {
 });
 
 router.post("/clients", requireSuperAdmin, async (req, res) => {
-  const { name, slug } = req.body;
-  if (!name || !slug) return res.status(400).json({ error: "name e slug obrigatórios" });
-  const client = await db.createSaasClient(name, slug.toLowerCase().replace(/\s+/g, "-"));
-  res.status(201).json(client);
+  const { name, email, password } = req.body;
+  if (!name) return res.status(400).json({ error: "Nome obrigatório" });
+  if (!email || !password) return res.status(400).json({ error: "Email e senha obrigatórios para criar o acesso do cliente" });
+  if (password.length < 6) return res.status(400).json({ error: "Senha mínima de 6 caracteres" });
+
+  // Gera slug a partir do nome
+  const slug = name.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")
+    .slice(0, 50);
+
+  // Verifica se email já existe
+  const existingUser = await db.getUserByEmail(email.toLowerCase());
+  if (existingUser) return res.status(400).json({ error: "Este email já está em uso" });
+
+  const client = await db.createSaasClient(name, slug);
+
+  // Cria usuário admin vinculado ao cliente
+  const hashed = await bcrypt.hash(password, 10);
+  const user = await db.createUser(name, email.toLowerCase(), hashed, "admin", client.id);
+
+  res.status(201).json({ ...client, adminUser: { id: user.id, email: user.email } });
 });
 
 router.put("/clients/:id", requireSuperAdmin, async (req, res) => {
-  const { name, slug } = req.body;
-  const client = await db.updateSaasClient(req.params.id, name, slug);
-  if (!client) return res.status(404).json({ error: "Cliente não encontrado" });
+  const { name, email, password } = req.body;
+  if (!name) return res.status(400).json({ error: "Nome obrigatório" });
+
+  const existing = await db.getSaasClientById(req.params.id);
+  if (!existing) return res.status(404).json({ error: "Cliente não encontrado" });
+
+  const client = await db.updateSaasClient(req.params.id, name, existing.slug);
+
+  // Atualiza o usuário admin vinculado, se fornecido
+  if (email || password) {
+    const adminUser = await db.getAdminUserByClientId(req.params.id);
+
+    if (adminUser) {
+      if (email) {
+        const emailConflict = await db.getUserByEmail(email.toLowerCase());
+        if (emailConflict && emailConflict.id !== adminUser.id)
+          return res.status(400).json({ error: "Este email já está em uso" });
+        await db.updateUserEmailAndName(adminUser.id, name, email.toLowerCase());
+      }
+      if (password) {
+        if (password.length < 6)
+          return res.status(400).json({ error: "Senha mínima de 6 caracteres" });
+        const hashed = await bcrypt.hash(password, 10);
+        await db.updateUserPassword(adminUser.id, hashed);
+      }
+    } else {
+      if (!email || !password)
+        return res.status(400).json({ error: "Email e senha obrigatórios para criar o acesso" });
+      if (password.length < 6)
+        return res.status(400).json({ error: "Senha mínima de 6 caracteres" });
+      const emailConflict = await db.getUserByEmail(email.toLowerCase());
+      if (emailConflict)
+        return res.status(400).json({ error: "Este email já está em uso" });
+      const hashed = await bcrypt.hash(password, 10);
+      await db.createUser(name, email.toLowerCase(), hashed, "admin", req.params.id);
+    }
+  }
+
   res.json(client);
 });
 
@@ -60,16 +113,23 @@ router.get("/experts", async (req, res) => {
 });
 
 router.post("/experts", requireSuperAdmin, async (req, res) => {
-  const { clientId, name, slug } = req.body;
-  if (!clientId || !name || !slug) return res.status(400).json({ error: "Campos obrigatórios" });
-  const expert = await db.createExpert(clientId, name, slug.toLowerCase().replace(/\s+/g, "-"));
+  const { clientId, name } = req.body;
+  if (!clientId || !name) return res.status(400).json({ error: "clientId e nome são obrigatórios" });
+  const slug = name.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")
+    .slice(0, 50) + "-" + Date.now().toString(36);
+  const expert = await db.createExpert(clientId, name, slug);
   res.status(201).json(expert);
 });
 
 router.put("/experts/:id", requireSuperAdmin, async (req, res) => {
-  const { name, slug } = req.body;
-  const expert = await db.updateExpert(req.params.id, name, slug);
-  if (!expert) return res.status(404).json({ error: "Expert não encontrado" });
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: "Nome obrigatório" });
+  const existing = await db.getExpertById(req.params.id);
+  if (!existing) return res.status(404).json({ error: "Expert não encontrado" });
+  // Mantém slug existente para não quebrar dados históricos
+  const expert = await db.updateExpert(req.params.id, name, existing.slug);
   res.json(expert);
 });
 

@@ -1,44 +1,49 @@
 @import "tailwindcss";
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
   background: #0a0a0a;
   color: #e5e5e5;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
+  overflow: hidden; /* previne scroll duplo — o scroll é na área de conteúdo */
 }
 
-#root {
-  min-height: 100vh;
-  width: 100%;
-}
+#root { height: 100vh; width: 100%; }
 
 /* scrollbar */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #141414; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
 
 /* count-up animation */
 @keyframes countUp {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.count-up { animation: countUp 0.5s ease-out; }
+.count-up { animation: countUp 0.6s cubic-bezier(0.16,1,0.3,1); }
 
-/* skeleton pulse */
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.4; }
+/* skeleton */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
 }
-.skeleton { animation: pulse 1.5s ease-in-out infinite; }
+.skeleton {
+  background: linear-gradient(90deg, #141414 25%, #1e1e1e 50%, #141414 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.6s infinite;
+}
 
-/* recharts overrides */
+/* glow amarelo nos cards */
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,215,0,0); }
+  50%       { box-shadow: 0 0 20px 2px rgba(255,215,0,0.08); }
+}
+.card-glow:hover { animation: glowPulse 2s ease-in-out infinite; }
+
+/* recharts */
 .recharts-tooltip-wrapper { outline: none !important; }
-.recharts-cartesian-axis-tick text { fill: #666 !important; font-size: 12px; }
-.recharts-cartesian-grid line { stroke: #1e1e1e !important; }
+.recharts-cartesian-axis-tick text { fill: #555 !important; font-size: 11px; }
+.recharts-cartesian-grid line { stroke: #1a1a1a !important; }

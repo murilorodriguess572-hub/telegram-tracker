@@ -6,15 +6,36 @@ import BotForm from '../components/Forms/BotForm'
 import api from '../lib/api'
 import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Building2, UserCircle2, Bot } from 'lucide-react'
 
-function Modal({ title, children, onClose }) {
+function Modal({ title, children, onClose, wide }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="bg-[#111111] border border-[#2a2a2a] rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#1e1e1e]">
-          <h3 className="text-white font-semibold">{title}</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">✕</button>
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 50,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 16, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)',
+      }}
+    >
+      <div
+        style={{
+          background: '#111', border: '1px solid #2a2a2a', borderRadius: 20,
+          borderTop: '3px solid #FFD700',
+          width: '100%', maxWidth: wide ? 640 : 520,
+          maxHeight: '90vh', overflowY: 'auto',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 32px', borderBottom: '1px solid #1e1e1e' }}>
+          <h3 style={{ color: '#fff', fontWeight: 600, fontSize: 16 }}>{title}</h3>
+          <button
+            onClick={onClose}
+            style={{ color: '#555', background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, lineHeight: 1 }}
+            onMouseEnter={e => e.target.style.color = '#fff'}
+            onMouseLeave={e => e.target.style.color = '#555'}
+          >
+            ✕
+          </button>
         </div>
-        <div className="px-6 py-5">{children}</div>
+        <div style={{ padding: 32 }}>{children}</div>
       </div>
     </div>
   )
@@ -110,12 +131,17 @@ export default function Settings() {
       <div className="space-y-6 max-w-4xl">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-white text-2xl font-bold">Configurações</h1>
-            <p className="text-gray-500 text-sm mt-0.5">Gerencie clientes, experts e bots</p>
+            <h1 style={{ color: '#fff', fontWeight: 700, fontSize: 28 }}>Configurações</h1>
+            <p className="text-gray-500 text-sm mt-1">Gerencie clientes, experts e bots</p>
           </div>
           <button
             onClick={() => setModal({ type: 'client' })}
-            className="flex items-center gap-2 px-4 py-2 bg-[#FFD700] text-black text-sm font-medium rounded-lg hover:bg-[#F5C400] transition-colors"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '12px 24px', background: '#FFD700', color: '#000',
+              fontWeight: 700, fontSize: 14, borderRadius: 10, border: 'none',
+              cursor: 'pointer', boxShadow: '0 2px 12px rgba(255,215,0,0.25)',
+            }}
           >
             <Plus size={16} /> Novo Cliente
           </button>
@@ -273,7 +299,7 @@ export default function Settings() {
         </Modal>
       )}
       {modal?.type === 'bot' && (
-        <Modal title={modal.data ? 'Editar Bot' : 'Novo Bot'} onClose={closeModal}>
+        <Modal title={modal.data ? 'Editar Bot' : 'Novo Bot'} onClose={closeModal} wide>
           <BotForm
             bot={modal.data}
             expertId={modal.expertId}

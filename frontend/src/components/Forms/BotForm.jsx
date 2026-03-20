@@ -51,7 +51,11 @@ export default function BotForm({ bot, expertId, clientId, onSave, onCancel }) {
     e.preventDefault()
     setLoading(true); setError('')
     try {
-      const payload = { ...data, expertId, clientId }
+      const autoSlug = data.name.toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+        .slice(0, 40) + '-' + Date.now().toString(36)
+      const payload = { ...data, slug: bot ? data.slug : autoSlug, expertId, clientId }
       const result = bot
         ? await api.put(`/bots/${bot.id}`, payload)
         : await api.post('/bots', payload)
@@ -67,10 +71,16 @@ export default function BotForm({ bot, expertId, clientId, onSave, onCancel }) {
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm px-4 py-2 rounded-lg">{error}</div>}
 
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Nome do Bot" name="name" value={data.name} onChange={onChange} placeholder="Bot 1 - Criativo Video" />
-        <Field label="Slug (ID único)" name="slug" value={data.slug} onChange={onChange} placeholder="maria-bot-1" hint="Usado nas URLs. Não altere após criar." />
-      </div>
+      <Field label="Nome do Bot" name="name" value={data.name} onChange={onChange} placeholder="Bot 1 - Criativo Video" />
+      {bot && (
+        <div>
+          <label className="block text-xs font-medium text-gray-400 mb-1">Slug (ID único)</label>
+          <div className="w-full bg-[#0d0d0d] border border-[#1e1e1e] text-gray-600 text-sm rounded-lg px-3 py-2 font-mono">
+            {data.slug}
+          </div>
+          <p className="text-xs text-gray-700 mt-1">O slug não pode ser alterado após a criação.</p>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <Field label="Token do Bot" name="botToken" value={data.botToken} onChange={onChange} placeholder="1234567890:ABCD..." />

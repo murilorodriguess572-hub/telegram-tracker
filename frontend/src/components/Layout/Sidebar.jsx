@@ -1,72 +1,83 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import {
-  LayoutDashboard, Users, Settings, LogOut, Zap, ChevronRight, UserCircle
-} from 'lucide-react'
+import { LayoutDashboard, Settings, LogOut, Zap, UserCircle } from 'lucide-react'
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Overview', superOnly: false },
-  { to: '/clients', icon: Users, label: 'Clientes', superOnly: true },
   { to: '/settings', icon: Settings, label: 'Configurações', superOnly: true },
   { to: '/account', icon: UserCircle, label: 'Minha Conta', superOnly: false },
 ]
 
+const roleLabel = { superadmin: 'Super Admin', admin: 'Admin', viewer: 'Visualizador' }
+
 export default function Sidebar() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-
   const handleLogout = () => { logout(); navigate('/login') }
-
-  const items = navItems.filter(item => !item.superOnly || user?.role === 'superadmin')
+  const items = navItems.filter(i => !i.superOnly || user?.role === 'superadmin')
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-60 bg-[#0d0d0d] border-r border-[#1e1e1e] flex flex-col z-40">
+    <aside
+      className="fixed left-0 top-0 h-screen flex flex-col z-40"
+      style={{ width: 220, background: '#0d0d0d', borderRight: '1px solid #1a1a1a' }}
+    >
       {/* Logo */}
-      <div className="px-5 py-6 border-b border-[#1e1e1e]">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-[#FFD700] rounded-lg flex items-center justify-center">
-            <Zap size={16} className="text-black" fill="black" />
-          </div>
-          <div>
-            <p className="text-white font-bold text-sm leading-none">Expert</p>
-            <p className="text-[#FFD700] font-bold text-sm leading-none">Tracking</p>
-          </div>
+      <div className="flex items-center gap-2.5 px-4 py-4" style={{ borderBottom: '1px solid #1a1a1a' }}>
+        <div
+          className="flex items-center justify-center rounded-lg flex-shrink-0"
+          style={{ width: 32, height: 32, background: '#FFD700', boxShadow: '0 0 16px rgba(255,215,0,0.3)' }}
+        >
+          <Zap size={16} color="#000" fill="#000" />
+        </div>
+        <div className="leading-none">
+          <p className="text-white font-bold text-sm">Expert</p>
+          <p className="font-bold text-sm" style={{ color: '#FFD700' }}>Tracking</p>
         </div>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
+        <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest px-2 mb-2">Menu</p>
         {items.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/'}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all group ${
-                isActive
-                  ? 'bg-[#FFD700]/10 text-[#FFD700] font-medium'
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+              `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-all ${
+                isActive ? 'text-black' : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
               }`
             }
+            style={({ isActive }) => isActive ? {
+              background: 'linear-gradient(135deg,#FFD700,#F5C400)',
+              boxShadow: '0 2px 10px rgba(255,215,0,0.22)',
+            } : {}}
           >
-            <Icon size={18} />
-            <span className="flex-1">{label}</span>
-            <ChevronRight size={14} className="opacity-0 group-hover:opacity-50 transition-opacity" />
+            <Icon size={16} />
+            <span>{label}</span>
           </NavLink>
         ))}
       </nav>
 
       {/* User footer */}
-      <div className="px-3 py-4 border-t border-[#1e1e1e]">
-        <div className="px-3 py-2 mb-1">
-          <p className="text-white text-sm font-medium truncate">{user?.name}</p>
-          <p className="text-gray-500 text-xs truncate">{user?.email}</p>
+      <div className="px-3 py-3" style={{ borderTop: '1px solid #1a1a1a' }}>
+        <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg mb-1" style={{ background: '#111' }}>
+          <div
+            className="flex items-center justify-center rounded-full flex-shrink-0"
+            style={{ width: 28, height: 28, background: 'rgba(255,215,0,0.1)' }}
+          >
+            <UserCircle size={15} style={{ color: '#FFD700' }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-white text-xs font-semibold truncate">{user?.name}</p>
+            <p className="text-gray-600 text-[11px] truncate">{roleLabel[user?.role]}</p>
+          </div>
         </div>
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:text-red-400 hover:bg-red-400/5 transition-all"
+          className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg text-[13px] text-gray-500 hover:text-red-400 hover:bg-red-400/5 transition-all"
         >
-          <LogOut size={18} />
+          <LogOut size={15} />
           Sair
         </button>
       </div>

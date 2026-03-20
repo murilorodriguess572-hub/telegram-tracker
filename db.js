@@ -499,6 +499,18 @@ async function updateUserPassword(id, hashedPassword) {
   await pool.query(`UPDATE users SET password = $1 WHERE id = $2`, [hashedPassword, id]);
 }
 
+async function updateUserEmailAndName(id, name, email) {
+  await pool.query(`UPDATE users SET name = $1, email = $2 WHERE id = $3`, [name, email, id]);
+}
+
+async function getAdminUserByClientId(clientId) {
+  const result = await pool.query(
+    `SELECT * FROM users WHERE client_id = $1 AND role = 'admin' ORDER BY created_at ASC LIMIT 1`,
+    [clientId]
+  );
+  return result.rows[0] || null;
+}
+
 async function getUsers() {
   const result = await pool.query(
     `SELECT u.id, u.name, u.email, u.role, u.client_id, c.name as client_name, u.created_at
@@ -518,5 +530,5 @@ module.exports = {
   getSaasClients, getSaasClientById, getSaasClientBySlug, createSaasClient, updateSaasClient, deleteSaasClient,
   getExperts, getExpertById, createExpert, updateExpert, deleteExpert,
   getBots, getBotsByClient, getAllBots, getBotById, getBotBySlug, createBot, updateBot, deleteBot,
-  getUserByEmail, getUserById, createUser, updateUserPassword, getUsers,
+  getUserByEmail, getUserById, createUser, updateUserPassword, updateUserEmailAndName, getAdminUserByClientId, getUsers,
 };
