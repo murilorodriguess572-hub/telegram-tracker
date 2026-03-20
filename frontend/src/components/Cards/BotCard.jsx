@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Bot, Users, TrendingUp, ArrowRight } from 'lucide-react'
 import Badge from '../UI/Badge'
 import CountUp from '../UI/CountUp'
+import BotStatusBadge from '../UI/BotStatusBadge'
 
 export default function BotCard({ bot }) {
   const { id, name, counts = {}, activeCount = 0, active } = bot
@@ -26,6 +27,9 @@ export default function BotCard({ bot }) {
             <Badge variant={active ? 'active' : 'inactive'} className="mt-1">
               {active ? 'Ativo' : 'Inativo'}
             </Badge>
+            <div className="mt-2">
+              <BotStatusBadge botId={id} />
+            </div>
           </div>
         </div>
         <ArrowRight size={16} className="text-gray-600 group-hover:text-[#FFD700] transition-colors" />

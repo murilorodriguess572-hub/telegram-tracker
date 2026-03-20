@@ -53,6 +53,7 @@ function getClient(clientId) {
 // ── API Routes ────────────────────────────────────────────────
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api", require("./routes/api"));
+app.use("/api", require("./routes/botStatus"));
 
 // ── DASHBOARD (legado HTML) ───────────────────────────────────
 app.get("/dashboard", async (req, res) => {
