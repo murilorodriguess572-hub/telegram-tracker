@@ -28,6 +28,7 @@ export default function BotPage() {
   const [botInfo, setBotInfo] = useState(null)
   const [metrics, setMetrics] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const fetchRef = useRef(0)
   const tz = 'America/Sao_Paulo'
   const today = new Date().toLocaleDateString('en-CA', { timeZone: tz })
@@ -38,7 +39,8 @@ export default function BotPage() {
 
   const fetchData = async (start, end) => {
     const currentFetch = ++fetchRef.current
-    setLoading(true)
+    if (!metrics) setLoading(true)
+    else setRefreshing(true)
     try {
       const bot = await api.get(`/bots/${id}`)
       if (currentFetch !== fetchRef.current) return
@@ -48,7 +50,7 @@ export default function BotPage() {
       setMetrics(m)
     } catch (e) { console.error(e) }
     finally {
-      if (currentFetch === fetchRef.current) setLoading(false)
+      if (currentFetch === fetchRef.current) { setLoading(false); setRefreshing(false) }
     }
   }
 
@@ -59,7 +61,7 @@ export default function BotPage() {
   const byDay = (metrics?.byDay || []).map(r => ({ dia: r.dia?.slice(5), total: Number(r.total) }))
 
   return (
-    <PageWrapper onRefresh={() => fetchData(startDate, endDate)} loading={loading}>
+    <PageWrapper onRefresh={() => fetchData(startDate, endDate)} loading={loading} refreshing={refreshing}>
       <div className="space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>

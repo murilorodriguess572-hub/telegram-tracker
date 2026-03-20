@@ -12,6 +12,7 @@ export default function ClientPage() {
   const { id } = useParams()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const fetchRef = useRef(0)
   const tz = 'America/Sao_Paulo'
   const today = new Date().toLocaleDateString('en-CA', { timeZone: tz })
@@ -22,14 +23,15 @@ export default function ClientPage() {
 
   const fetchData = async (start, end) => {
     const currentFetch = ++fetchRef.current
-    setLoading(true)
+    if (!data) setLoading(true)
+    else setRefreshing(true)
     try {
       const res = await api.get(`/metrics/client/${id}?start=${start}&end=${end}`)
       if (currentFetch !== fetchRef.current) return
       setData(res)
     } catch (e) { console.error(e) }
     finally {
-      if (currentFetch === fetchRef.current) setLoading(false)
+      if (currentFetch === fetchRef.current) { setLoading(false); setRefreshing(false) }
     }
   }
 
@@ -41,7 +43,7 @@ export default function ClientPage() {
   }, {}) || {}
 
   return (
-    <PageWrapper onRefresh={() => fetchData(startDate, endDate)} loading={loading}>
+    <PageWrapper onRefresh={() => fetchData(startDate, endDate)} loading={loading} refreshing={refreshing}>
       <div className="space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
