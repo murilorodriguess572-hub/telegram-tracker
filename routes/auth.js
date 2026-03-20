@@ -28,7 +28,7 @@ router.post("/login", async (req, res) => {
 router.get("/me", authMiddleware, async (req, res) => {
   const user = await db.getUserById(req.user.id);
   if (!user) return res.status(404).json({ error: "Usuário não encontrado" });
-  res.json(user);
+  res.json({ ...user, clientId: user.client_id });
 });
 
 // POST /api/auth/change-password
