@@ -10,6 +10,7 @@ import LineChart from '../components/Charts/LineChart'
 import FunnelChart from '../components/Charts/FunnelChart'
 import HeatmapChart from '../components/Charts/HeatmapChart'
 import api from '../lib/api'
+import IntegrationScript from '../components/UI/IntegrationScript'
 import { Users, TrendingUp, Flame, MousePointer, Clock, Activity } from 'lucide-react'
 
 function Section({ title, children }) {
@@ -114,6 +115,15 @@ export default function BotPage() {
             : <HeatmapChart data={metrics?.byHour || []} />
           }
         </Section>
+
+        {botInfo?.slug && (
+          <Section title="Script de Integração">
+            <IntegrationScript
+              botSlug={botInfo.slug}
+              appUrl={window.location.origin}
+            />
+          </Section>
+        )}
 
         <Section title="Eventos Recentes">
           {loading

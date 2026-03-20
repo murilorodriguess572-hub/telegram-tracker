@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import api from '../../lib/api'
+import IntegrationScript from '../UI/IntegrationScript'
 
 const defaultData = {
   name: '', slug: '', botToken: '', botUsername: '', chatId: '',
@@ -115,6 +116,13 @@ export default function BotForm({ bot, expertId, clientId, onSave, onCancel }) {
         <input type="checkbox" name="active" id="active" checked={data.active} onChange={onChange} className="accent-[#FFD700]" />
         <label htmlFor="active" className="text-sm text-gray-300">Bot ativo</label>
       </div>
+
+      {bot?.slug && (
+        <IntegrationScript
+          botSlug={bot.slug}
+          appUrl={window.location.origin}
+        />
+      )}
 
       <div className="flex justify-end gap-3 pt-2">
         <button type="button" onClick={onCancel} className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">
