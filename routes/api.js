@@ -191,14 +191,16 @@ router.delete("/bots/:id", requireSuperAdmin, async (req, res) => {
 // ════════════════════════════════════════════════════════════
 
 function parseDateRange(query) {
-  const tz = "America/Sao_Paulo";
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: tz });
-  const start = query.start || today;
-  const end = query.end || today;
+  const tz = 'America/Sao_Paulo'
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: tz })
+  const start = query.start || today
+  const end   = query.end   || today
+
+  // Usa o banco para interpretar no timezone correto
   return {
-    startDate: new Date(start + "T00:00:00-03:00"),
-    endDate: new Date(end + "T23:59:59-03:00"),
-  };
+    startDate: new Date(`${start}T00:00:00-03:00`),
+    endDate:   new Date(`${end}T23:59:59-03:00`),
+  }
 }
 
 // GET /api/metrics/:botSlug

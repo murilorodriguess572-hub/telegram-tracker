@@ -201,7 +201,9 @@ async function getEventCounts(clientId, startDate, endDate) {
   const result = await pool.query(`
     SELECT event_type, COUNT(*) as count
     FROM events
-    WHERE client_id = $1 AND created_at >= $2 AND created_at <= $3
+    WHERE client_id = $1
+      AND (created_at AT TIME ZONE 'America/Sao_Paulo') >= ($2 AT TIME ZONE 'America/Sao_Paulo')
+      AND (created_at AT TIME ZONE 'America/Sao_Paulo') <= ($3 AT TIME ZONE 'America/Sao_Paulo')
     GROUP BY event_type
   `, [clientId, startDate, endDate]);
 
@@ -212,7 +214,8 @@ async function getEventCounts(clientId, startDate, endDate) {
 
 async function getRecentEvents(clientId, limit = 20) {
   const result = await pool.query(`
-    SELECT event_type, first_name, username, fbclid, days_in_group, created_at
+    SELECT event_type, first_name, username, fbclid, days_in_group,
+           (created_at AT TIME ZONE 'America/Sao_Paulo') AS created_at
     FROM events WHERE client_id = $1
     ORDER BY created_at DESC LIMIT $2
   `, [clientId, limit]);
@@ -225,7 +228,7 @@ async function getEventsByDay(clientId, days = 30) {
            COUNT(*) as total
     FROM events
     WHERE client_id = $1 AND event_type = 'entered'
-      AND created_at >= NOW() - INTERVAL '${parseInt(days)} days'
+      AND (created_at AT TIME ZONE 'America/Sao_Paulo') >= (NOW() AT TIME ZONE 'America/Sao_Paulo') - INTERVAL '${parseInt(days)} days'
     GROUP BY dia ORDER BY dia
   `, [clientId]);
   return result.rows;
@@ -247,7 +250,8 @@ async function getFunnelCounts(clientId, startDate, endDate) {
     SELECT event_type, COUNT(*) as total
     FROM events
     WHERE client_id = $1
-      AND created_at >= $2 AND created_at <= $3
+      AND (created_at AT TIME ZONE 'America/Sao_Paulo') >= ($2 AT TIME ZONE 'America/Sao_Paulo')
+      AND (created_at AT TIME ZONE 'America/Sao_Paulo') <= ($3 AT TIME ZONE 'America/Sao_Paulo')
     GROUP BY event_type
   `, [clientId, startDate, endDate]);
   const counts = {};
