@@ -17,7 +17,7 @@ export default function IntegrationScript({ botSlug, appUrl }) {
   return (
     <div style={{ marginTop: 16, border: '1px solid #1e1e1e', borderRadius: 12, overflow: 'hidden', background: '#0d0d0d' }}>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
         style={{
           width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer',
@@ -45,7 +45,7 @@ export default function IntegrationScript({ botSlug, appUrl }) {
               {script}
             </pre>
             <button
-              onClick={copy}
+              onClick={(e) => { e.stopPropagation(); copy() }}
               style={{
                 position: 'absolute', top: 8, right: 8,
                 display: 'flex', alignItems: 'center', gap: 5,
