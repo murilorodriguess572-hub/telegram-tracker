@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import PageWrapper from '../components/Layout/PageWrapper'
 import MetricCard from '../components/Cards/MetricCard'
 import MemberRow from '../components/Cards/MemberRow'
-import DateFilter, { getDateRange } from '../components/UI/DateFilter'
+import DateFilter from '../components/UI/DateFilter'
 import LoadingSkeleton from '../components/UI/LoadingSkeleton'
 import { SkeletonRow } from '../components/UI/LoadingSkeleton'
 import LineChart from '../components/Charts/LineChart'
@@ -28,20 +28,25 @@ export default function BotPage() {
   const [botInfo, setBotInfo] = useState(null)
   const [metrics, setMetrics] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [dateRange, setDateRange] = useState(getDateRange('today'))
+  const tz = 'America/Sao_Paulo'
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: tz })
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6)
+  const [startDate, setStartDate] = useState(sevenDaysAgo.toLocaleDateString('en-CA', { timeZone: tz }))
+  const [endDate, setEndDate] = useState(today)
 
   const fetchData = async () => {
     setLoading(true)
     try {
       const bot = await api.get(`/bots/${id}`)
       setBotInfo(bot)
-      const m = await api.get(`/metrics/${bot.slug}?start=${dateRange.start}&end=${dateRange.end}&days=30`)
+      const m = await api.get(`/metrics/${bot.slug}?start=${startDate}&end=${endDate}&days=30`)
       setMetrics(m)
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
   }
 
-  useEffect(() => { fetchData() }, [id, dateRange])
+  useEffect(() => { fetchData() }, [id, startDate, endDate])
 
   const counts = metrics?.counts || {}
   const convRate = counts.pageviews > 0 ? ((counts.entered / counts.pageviews) * 100).toFixed(1) : '0.0'
@@ -55,7 +60,7 @@ export default function BotPage() {
             <h1 className="text-white text-2xl font-bold">{botInfo?.name || 'Bot'}</h1>
             <p className="text-gray-600 text-xs font-mono mt-0.5">{botInfo?.slug}</p>
           </div>
-          <DateFilter onChange={setDateRange} />
+          <DateFilter onChange={({ start, end }) => { setStartDate(start); setEndDate(end) }} />
         </div>
 
         {loading ? <LoadingSkeleton cards={4} /> : (

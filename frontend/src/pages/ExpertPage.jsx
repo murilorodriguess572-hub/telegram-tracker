@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import PageWrapper from '../components/Layout/PageWrapper'
 import MetricCard from '../components/Cards/MetricCard'
 import BotCard from '../components/Cards/BotCard'
-import DateFilter, { getDateRange } from '../components/UI/DateFilter'
+import DateFilter from '../components/UI/DateFilter'
 import LoadingSkeleton from '../components/UI/LoadingSkeleton'
 import LineChart from '../components/Charts/LineChart'
 import api from '../lib/api'
@@ -13,18 +13,23 @@ export default function ExpertPage() {
   const { id } = useParams()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [dateRange, setDateRange] = useState(getDateRange('7d'))
+  const tz = 'America/Sao_Paulo'
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: tz })
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6)
+  const [startDate, setStartDate] = useState(sevenDaysAgo.toLocaleDateString('en-CA', { timeZone: tz }))
+  const [endDate, setEndDate] = useState(today)
 
   const fetch = async () => {
     setLoading(true)
     try {
-      const res = await api.get(`/metrics/expert/${id}?start=${dateRange.start}&end=${dateRange.end}`)
+      const res = await api.get(`/metrics/expert/${id}?start=${startDate}&end=${endDate}`)
       setData(res)
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
   }
 
-  useEffect(() => { fetch() }, [id, dateRange])
+  useEffect(() => { fetch() }, [id, startDate, endDate])
 
   const totals = data?.bots?.reduce((acc, b) => {
     for (const [k, v] of Object.entries(b.counts || {})) acc[k] = (acc[k] || 0) + v
@@ -44,7 +49,7 @@ export default function ExpertPage() {
             <h1 className="text-white text-2xl font-bold">{data?.expert?.name || 'Carregando...'}</h1>
             <p className="text-gray-500 text-sm mt-0.5">{data?.bots?.length || 0} bots</p>
           </div>
-          <DateFilter onChange={setDateRange} />
+          <DateFilter onChange={({ start, end }) => { setStartDate(start); setEndDate(end) }} />
         </div>
 
         {loading ? <LoadingSkeleton cards={4} /> : (

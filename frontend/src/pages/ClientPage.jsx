@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import PageWrapper from '../components/Layout/PageWrapper'
 import MetricCard from '../components/Cards/MetricCard'
-import DateFilter, { getDateRange } from '../components/UI/DateFilter'
+import DateFilter from '../components/UI/DateFilter'
 import LoadingSkeleton from '../components/UI/LoadingSkeleton'
 import CountUp from '../components/UI/CountUp'
 import api from '../lib/api'
@@ -12,18 +12,23 @@ export default function ClientPage() {
   const { id } = useParams()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [dateRange, setDateRange] = useState(getDateRange('today'))
+  const tz = 'America/Sao_Paulo'
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: tz })
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6)
+  const [startDate, setStartDate] = useState(sevenDaysAgo.toLocaleDateString('en-CA', { timeZone: tz }))
+  const [endDate, setEndDate] = useState(today)
 
   const fetch = async () => {
     setLoading(true)
     try {
-      const res = await api.get(`/metrics/client/${id}?start=${dateRange.start}&end=${dateRange.end}`)
+      const res = await api.get(`/metrics/client/${id}?start=${startDate}&end=${endDate}`)
       setData(res)
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
   }
 
-  useEffect(() => { fetch() }, [id, dateRange])
+  useEffect(() => { fetch() }, [id, startDate, endDate])
 
   const totals = data?.experts?.reduce((acc, e) => {
     for (const [k, v] of Object.entries(e.totals || {})) acc[k] = (acc[k] || 0) + v
@@ -38,7 +43,7 @@ export default function ClientPage() {
             <h1 className="text-white text-2xl font-bold">{data?.client?.name || 'Carregando...'}</h1>
             <p className="text-gray-500 text-sm mt-0.5">{data?.experts?.length || 0} experts</p>
           </div>
-          <DateFilter onChange={setDateRange} />
+          <DateFilter onChange={({ start, end }) => { setStartDate(start); setEndDate(end) }} />
         </div>
 
         {loading ? <LoadingSkeleton cards={4} /> : (
