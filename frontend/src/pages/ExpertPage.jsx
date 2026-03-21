@@ -7,7 +7,7 @@ import DateFilter from '../components/UI/DateFilter'
 import LoadingSkeleton from '../components/UI/LoadingSkeleton'
 import LineChart from '../components/Charts/LineChart'
 import api from '../lib/api'
-import { Users, TrendingUp, Flame, MousePointer } from 'lucide-react'
+import { Users, TrendingUp, Flame, MousePointer, LogOut } from 'lucide-react'
 
 export default function ExpertPage() {
   const { id } = useParams()
@@ -63,6 +63,7 @@ export default function ExpertPage() {
             <MetricCard label="Entradas" value={totals.entered} icon={TrendingUp} color="#FFD700" />
             <MetricCard label="Hot Leads" value={totals.hotLeads} icon={Flame} color="#f97316" />
             <MetricCard label="Taxa de Conv." value={null} icon={MousePointer} color="#22c55e" sub={`${convRate}% (views → entradas)`} />
+            <MetricCard label="Saídas do Canal" value={totals.exitedTotal || (totals.coldLeads || 0) + (totals.exited || 0) + (totals.hotLeads || 0)} icon={LogOut} color="#ef4444" />
           </div>
         )}
 

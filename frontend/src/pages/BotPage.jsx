@@ -2,12 +2,11 @@ import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import PageWrapper from '../components/Layout/PageWrapper'
 import MetricCard from '../components/Cards/MetricCard'
-import MemberRow from '../components/Cards/MemberRow'
 import DateFilter from '../components/UI/DateFilter'
 import LoadingSkeleton from '../components/UI/LoadingSkeleton'
 import { SkeletonRow } from '../components/UI/LoadingSkeleton'
 import LineChart from '../components/Charts/LineChart'
-import FunnelChart from '../components/Charts/FunnelChart'
+import FunnelViz from '../components/Charts/FunnelViz'
 import HeatmapChart from '../components/Charts/HeatmapChart'
 import api from '../lib/api'
 import IntegrationScript from '../components/UI/IntegrationScript'
@@ -83,20 +82,8 @@ export default function BotPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Section title="Funil de Conversão">
             {loading
-              ? <div className="space-y-3">{[1,2,3,4,5].map(i => <div key={i} className="h-14 bg-[#1a1a1a] rounded-lg skeleton" />)}</div>
-              : <FunnelChart counts={counts} />
-            }
-          </Section>
-
-          <Section title={`Membros Ativos (${metrics?.members?.length || 0})`}>
-            {loading
-              ? <div>{[1,2,3,4].map(i => <SkeletonRow key={i} />)}</div>
-              : (
-                <div className="max-h-80 overflow-y-auto">
-                  {metrics?.members?.length === 0 && <p className="text-gray-500 text-sm text-center py-4">Nenhum membro ativo</p>}
-                  {metrics?.members?.map((m, i) => <MemberRow key={i} member={m} hotLeadDays={botInfo?.hot_lead_days || 3} />)}
-                </div>
-              )
+              ? <div className="space-y-3">{[1,2,3,4].map(i => <div key={i} className="h-14 bg-[#1a1a1a] rounded-lg skeleton" />)}</div>
+              : <FunnelViz counts={counts} />
             }
           </Section>
         </div>
