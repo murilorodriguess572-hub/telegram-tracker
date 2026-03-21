@@ -79,21 +79,20 @@ export default function BotPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
           <Section title="Funil de Conversão">
             {loading
-              ? <div className="space-y-3">{[1,2,3,4].map(i => <div key={i} className="h-14 bg-[#1a1a1a] rounded-lg skeleton" />)}</div>
+              ? <div className="h-48 bg-[#1a1a1a] rounded-lg skeleton" />
               : <FunnelViz counts={counts} />
             }
           </Section>
+          <Section title="Entradas por Dia (últimos 30 dias)">
+            {loading
+              ? <div className="h-48 bg-[#1a1a1a] rounded-lg skeleton" />
+              : <LineChart data={byDay} lines={[{ dataKey: 'total', name: 'Entradas', color: '#FFD700' }]} />
+            }
+          </Section>
         </div>
-
-        <Section title="Entradas por Dia (últimos 30 dias)">
-          {loading
-            ? <div className="h-60 bg-[#1a1a1a] rounded-lg skeleton" />
-            : <LineChart data={byDay} lines={[{ dataKey: 'total', name: 'Entradas', color: '#FFD700' }]} />
-          }
-        </Section>
 
         <Section title="Distribuição por Hora do Dia">
           {loading

@@ -1,58 +1,54 @@
 export default function FunnelViz({ counts }) {
   const steps = [
-    { label: 'Page Views',        value: counts.pageviews  || 0, color: '#3b82f6' },
-    { label: 'Cliques LP',        value: counts.clicks     || 0, color: '#8b5cf6' },
-    { label: 'Entraram no Grupo', value: counts.entered    || 0, color: '#FFD700' },
-    { label: 'Clicaram na Casa',  value: counts.betClicks  || 0, color: '#f97316' },
+    { label: 'Page Views', value: counts.pageviews || 0, color: '#3b82f6' },
+    { label: 'Cliques LP', value: counts.clicks    || 0, color: '#8b5cf6' },
+    { label: 'Entraram',   value: counts.entered   || 0, color: '#FFD700' },
+    { label: 'Casa',       value: counts.betClicks || 0, color: '#f97316' },
   ]
 
-  const max = steps[0].value || 1
+  const max = Math.max(...steps.map(s => s.value), 1)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-      {steps.map((step, i) => {
-        const pct = Math.max((step.value / max) * 100, step.value > 0 ? 4 : 0)
-        const conv = i > 0 && steps[i - 1].value > 0
-          ? ((step.value / steps[i - 1].value) * 100).toFixed(1)
-          : null
-
-        return (
-          <div key={step.label}>
-            <div style={{ position: 'relative', marginBottom: 2 }}>
+    <div style={{ width: '100%', padding: '8px 0' }}>
+      {/* Barras verticais alinhadas na base */}
+      <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end', height: 200, width: '100%' }}>
+        {steps.map((step) => {
+          const heightPct = Math.max((step.value / max) * 100, step.value > 0 ? 8 : 2)
+          return (
+            <div key={step.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
+              <span style={{ color: step.color, fontWeight: 800, fontSize: 22 }}>
+                {step.value.toLocaleString('pt-BR')}
+              </span>
               <div style={{
-                height: 52,
+                width: '100%',
+                height: `${heightPct}%`,
                 background: step.color,
-                width: `${pct}%`,
-                minWidth: step.value > 0 ? 60 : 0,
-                borderRadius: 4,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '0 14px',
-                transition: 'width 0.6s ease',
-                opacity: 0.92,
-              }}>
-                <span style={{ color: '#000', fontWeight: 700, fontSize: 13 }}>{step.label}</span>
-                <span style={{ color: '#000', fontWeight: 900, fontSize: 20 }}>{step.value.toLocaleString('pt-BR')}</span>
-              </div>
+                borderRadius: '6px 6px 0 0',
+                opacity: 0.9,
+                transition: 'height 0.6s ease',
+                minHeight: 4,
+              }} />
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Labels e conversão abaixo */}
+      <div style={{ display: 'flex', gap: 2, marginTop: 0 }}>
+        {steps.map((step, i) => {
+          const conv = i > 0 && steps[i - 1].value > 0
+            ? ((step.value / steps[i - 1].value) * 100).toFixed(1)
+            : null
+          return (
+            <div key={step.label} style={{ flex: 1, padding: '8px 4px', borderTop: `2px solid ${step.color}`, background: '#0d0d0d' }}>
+              <p style={{ color: '#aaa', fontSize: 11, fontWeight: 600, margin: 0 }}>{step.label}</p>
               {conv !== null && (
-                <div style={{
-                  position: 'absolute', left: `${pct}%`, top: '50%',
-                  transform: 'translate(8px, -50%)',
-                  background: '#1a1a1a', border: '1px solid #2a2a2a',
-                  borderRadius: 6, padding: '2px 8px',
-                  fontSize: 11, color: '#aaa', whiteSpace: 'nowrap',
-                }}>
-                  {conv}% conv.
-                </div>
+                <p style={{ color: '#555', fontSize: 10, margin: '2px 0 0' }}>{conv}% conv.</p>
               )}
             </div>
-            {i < steps.length - 1 && (
-              <div style={{ textAlign: 'left', paddingLeft: 20, color: '#333', fontSize: 16, lineHeight: 1, marginBottom: 2 }}>▼</div>
-            )}
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
     </div>
   )
 }
