@@ -55,6 +55,38 @@ function ConfirmDialog({ message, onConfirm, onCancel }) {
   )
 }
 
+function Badge({ children, color = '#555', bg = 'rgba(255,255,255,0.05)' }) {
+  return (
+    <span style={{
+      fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
+      background: bg, color, border: `1px solid ${color}22`,
+    }}>
+      {children}
+    </span>
+  )
+}
+
+function ActionBtn({ onClick, title, icon: Icon, hoverColor = '#FFD700' }) {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        width: 32, height: 32, borderRadius: 8, border: 'none', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: hovered ? `${hoverColor}18` : 'transparent',
+        color: hovered ? hoverColor : '#444',
+        transition: 'all 0.15s',
+      }}
+    >
+      <Icon size={16} />
+    </button>
+  )
+}
+
 export default function Settings() {
   const [clients, setClients] = useState([])
   const [expanded, setExpanded] = useState({})
@@ -128,139 +160,256 @@ export default function Settings() {
 
   return (
     <PageWrapper>
-      <div className="space-y-6 max-w-4xl">
-        <div className="flex items-center justify-between">
+      <div style={{ maxWidth: 860 }}>
+
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
           <div>
-            <h1 style={{ color: '#fff', fontWeight: 700, fontSize: 28 }}>Configurações</h1>
-            <p className="text-gray-500 text-sm mt-1">Gerencie clientes, experts e bots</p>
+            <h1 style={{ color: '#fff', fontWeight: 700, fontSize: 28, margin: 0 }}>Configurações</h1>
+            <p style={{ color: '#555', fontSize: 13, marginTop: 4 }}>Gerencie clientes, experts e bots</p>
           </div>
           <button
             onClick={() => setModal({ type: 'client' })}
             style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              padding: '12px 24px', background: '#FFD700', color: '#000',
-              fontWeight: 700, fontSize: 14, borderRadius: 10, border: 'none',
-              cursor: 'pointer', boxShadow: '0 2px 12px rgba(255,215,0,0.25)',
+              padding: '11px 22px', background: '#FFD700', color: '#000',
+              fontWeight: 700, fontSize: 13, borderRadius: 10, border: 'none',
+              cursor: 'pointer', boxShadow: '0 2px 16px rgba(255,215,0,0.25)',
             }}
           >
-            <Plus size={16} /> Novo Cliente
+            <Plus size={15} /> Novo Cliente
           </button>
         </div>
 
+        {/* Loading */}
         {loading ? (
-          <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-14 bg-[#141414] rounded-xl skeleton" />)}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[1, 2, 3].map(i => (
+              <div key={i} className="skeleton" style={{ height: 60, borderRadius: 14 }} />
+            ))}
+          </div>
         ) : (
-          <div className="space-y-3">
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+            {/* Empty state */}
             {clients.length === 0 && (
-              <div className="bg-[#111111] border border-[#1e1e1e] rounded-xl px-5 py-8 text-center text-gray-500 text-sm">
-                Nenhum cliente ainda. Clique em "Novo Cliente" para começar.
+              <div style={{
+                background: '#111', border: '1px solid #1e1e1e', borderRadius: 14,
+                padding: '48px 24px', textAlign: 'center',
+              }}>
+                <Building2 size={32} style={{ color: '#222', margin: '0 auto 12px' }} />
+                <p style={{ color: '#444', fontSize: 14, marginBottom: 16 }}>Nenhum cliente ainda.</p>
+                <button
+                  onClick={() => setModal({ type: 'client' })}
+                  style={{
+                    background: '#FFD700', color: '#000', fontWeight: 700, fontSize: 13,
+                    padding: '10px 24px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                  }}
+                >
+                  + Criar primeiro cliente
+                </button>
               </div>
             )}
-            {clients.map(client => (
-              <div key={client.id} className="bg-[#111111] border border-[#1e1e1e] rounded-xl overflow-hidden">
-                {/* Client header */}
-                <div className="flex items-center gap-3 px-4 py-3">
-                  <button onClick={() => toggleClient(client.id)} className="flex items-center gap-2 flex-1 text-left">
-                    {expanded[client.id] ? <ChevronDown size={16} className="text-gray-500" /> : <ChevronRight size={16} className="text-gray-500" />}
-                    <Building2 size={16} className="text-[#FFD700]" />
-                    <span className="text-white font-medium text-sm">{client.name}</span>
-                    <span className="text-gray-600 text-xs ml-1">/{client.slug}</span>
-                  </button>
-                  <div className="flex items-center gap-1">
+
+            {clients.map(client => {
+              const expertList = experts[client.id] || []
+              const isExpanded = !!expanded[client.id]
+
+              return (
+                <div key={client.id} style={{
+                  background: '#111', border: '1px solid #1e1e1e',
+                  borderRadius: 14, overflow: 'hidden',
+                }}>
+                  {/* Client header */}
+                  <div style={{
+                    background: '#141414', padding: '14px 18px',
+                    display: 'flex', alignItems: 'center', gap: 10,
+                  }}>
                     <button
-                      onClick={() => setModal({ type: 'expert', clientId: client.id })}
-                      className="p-1.5 text-gray-500 hover:text-green-400 hover:bg-green-400/10 rounded-lg transition-all"
-                      title="Adicionar Expert"
+                      onClick={() => toggleClient(client.id)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#444', display: 'flex', alignItems: 'center' }}
                     >
-                      <Plus size={14} />
+                      {isExpanded
+                        ? <ChevronDown size={16} style={{ color: '#555' }} />
+                        : <ChevronRight size={16} style={{ color: '#555' }} />}
                     </button>
-                    <button
-                      onClick={() => setModal({ type: 'client', data: client })}
-                      className="p-1.5 text-gray-500 hover:text-[#FFD700] hover:bg-[#FFD700]/10 rounded-lg transition-all"
-                    >
-                      <Pencil size={14} />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteClient(client)}
-                      className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    <div style={{
+                      width: 32, height: 32, borderRadius: 9,
+                      background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.15)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}>
+                      <Building2 size={15} style={{ color: '#FFD700' }} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>{client.name}</span>
+                    </div>
+                    <Badge color="#FFD700" bg="rgba(255,215,0,0.08)">
+                      {expertList.length > 0 ? expertList.length : (isExpanded ? expertList.length : '?')} experts
+                    </Badge>
+                    <div style={{ display: 'flex', gap: 2 }}>
+                      <ActionBtn
+                        onClick={() => setModal({ type: 'expert', clientId: client.id })}
+                        title="Adicionar Expert"
+                        icon={Plus}
+                        hoverColor="#4ade80"
+                      />
+                      <ActionBtn
+                        onClick={() => setModal({ type: 'client', data: client })}
+                        title="Editar Cliente"
+                        icon={Pencil}
+                        hoverColor="#FFD700"
+                      />
+                      <ActionBtn
+                        onClick={() => handleDeleteClient(client)}
+                        title="Excluir Cliente"
+                        icon={Trash2}
+                        hoverColor="#ef4444"
+                      />
+                    </div>
                   </div>
-                </div>
 
-                {/* Experts */}
-                {expanded[client.id] && (
-                  <div className="border-t border-[#1a1a1a]">
-                    {(experts[client.id] || []).map(expert => (
-                      <div key={expert.id} className="border-b border-[#1a1a1a] last:border-0">
-                        <div className="flex items-center gap-3 px-6 py-2.5">
-                          <button onClick={() => toggleExpert(expert.id)} className="flex items-center gap-2 flex-1 text-left">
-                            {expanded[`e-${expert.id}`] ? <ChevronDown size={14} className="text-gray-600" /> : <ChevronRight size={14} className="text-gray-600" />}
-                            <UserCircle2 size={14} className="text-purple-400" />
-                            <span className="text-gray-300 text-sm">{expert.name}</span>
+                  {/* Experts */}
+                  {isExpanded && (
+                    <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {expertList.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '24px 16px' }}>
+                          <UserCircle2 size={24} style={{ color: '#222', margin: '0 auto 8px' }} />
+                          <p style={{ color: '#444', fontSize: 12, marginBottom: 10 }}>Nenhum expert neste cliente.</p>
+                          <button
+                            onClick={() => setModal({ type: 'expert', clientId: client.id })}
+                            style={{
+                              background: 'rgba(168,85,247,0.1)', color: '#a855f7', fontSize: 12,
+                              fontWeight: 600, padding: '7px 16px', borderRadius: 8,
+                              border: '1px solid rgba(168,85,247,0.2)', cursor: 'pointer',
+                            }}
+                          >
+                            + Adicionar Expert
                           </button>
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => setModal({ type: 'bot', expertId: expert.id, clientId: client.id })}
-                              className="p-1 text-gray-600 hover:text-green-400 hover:bg-green-400/10 rounded transition-all"
-                              title="Adicionar Bot"
-                            >
-                              <Plus size={13} />
-                            </button>
-                            <button
-                              onClick={() => setModal({ type: 'expert', data: expert, clientId: client.id })}
-                              className="p-1 text-gray-600 hover:text-[#FFD700] hover:bg-[#FFD700]/10 rounded transition-all"
-                            >
-                              <Pencil size={13} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteExpert(expert, client.id)}
-                              className="p-1 text-gray-600 hover:text-red-400 hover:bg-red-400/10 rounded transition-all"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </div>
                         </div>
+                      ) : expertList.map(expert => {
+                        const botList = bots[expert.id] || []
+                        const expertExpanded = !!expanded[`e-${expert.id}`]
 
-                        {/* Bots */}
-                        {expanded[`e-${expert.id}`] && (
-                          <div className="pl-12 pr-4 pb-2 space-y-1">
-                            {(bots[expert.id] || []).map(bot => (
-                              <div key={bot.id} className="flex items-center gap-2 px-3 py-2 bg-[#0d0d0d] rounded-lg">
-                                <Bot size={13} className="text-[#FFD700]" />
-                                <span className="text-gray-400 text-xs flex-1">{bot.name}</span>
-                                <span className="text-gray-700 text-xs font-mono">{bot.slug}</span>
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() => setModal({ type: 'bot', data: bot, expertId: expert.id, clientId: client.id })}
-                                    className="p-1 text-gray-600 hover:text-[#FFD700] rounded transition-all"
-                                  >
-                                    <Pencil size={12} />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteBot(bot, expert.id)}
-                                    className="p-1 text-gray-600 hover:text-red-400 rounded transition-all"
-                                  >
-                                    <Trash2 size={12} />
-                                  </button>
-                                </div>
+                        return (
+                          <div key={expert.id} style={{
+                            background: '#0d0d0d', border: '1px solid #181818',
+                            borderRadius: 10, overflow: 'hidden',
+                          }}>
+                            {/* Expert header */}
+                            <div style={{
+                              background: '#0f0f0f', padding: '11px 14px',
+                              display: 'flex', alignItems: 'center', gap: 8,
+                            }}>
+                              <button
+                                onClick={() => toggleExpert(expert.id)}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}
+                              >
+                                {expertExpanded
+                                  ? <ChevronDown size={14} style={{ color: '#444' }} />
+                                  : <ChevronRight size={14} style={{ color: '#444' }} />}
+                              </button>
+                              <div style={{
+                                width: 26, height: 26, borderRadius: 7,
+                                background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.15)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                              }}>
+                                <UserCircle2 size={13} style={{ color: '#a855f7' }} />
                               </div>
-                            ))}
-                            {bots[expert.id]?.length === 0 && (
-                              <p className="text-gray-700 text-xs px-3 py-2">Nenhum bot. Clique em + para adicionar.</p>
+                              <span style={{ color: '#ccc', fontSize: 13, fontWeight: 500, flex: 1 }}>{expert.name}</span>
+                              <Badge color="#a855f7" bg="rgba(168,85,247,0.08)">
+                                {botList.length > 0 ? botList.length : (expertExpanded ? botList.length : '?')} bots
+                              </Badge>
+                              <div style={{ display: 'flex', gap: 1 }}>
+                                <ActionBtn
+                                  onClick={() => setModal({ type: 'bot', expertId: expert.id, clientId: client.id })}
+                                  title="Adicionar Bot"
+                                  icon={Plus}
+                                  hoverColor="#4ade80"
+                                />
+                                <ActionBtn
+                                  onClick={() => setModal({ type: 'expert', data: expert, clientId: client.id })}
+                                  title="Editar Expert"
+                                  icon={Pencil}
+                                  hoverColor="#FFD700"
+                                />
+                                <ActionBtn
+                                  onClick={() => handleDeleteExpert(expert, client.id)}
+                                  title="Excluir Expert"
+                                  icon={Trash2}
+                                  hoverColor="#ef4444"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Bots */}
+                            {expertExpanded && (
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                {botList.length === 0 ? (
+                                  <div style={{ textAlign: 'center', padding: '20px 16px' }}>
+                                    <Bot size={20} style={{ color: '#1e1e1e', margin: '0 auto 8px' }} />
+                                    <p style={{ color: '#333', fontSize: 12, marginBottom: 10 }}>Nenhum bot cadastrado.</p>
+                                    <button
+                                      onClick={() => setModal({ type: 'bot', expertId: expert.id, clientId: client.id })}
+                                      style={{
+                                        background: 'rgba(255,215,0,0.08)', color: '#FFD700', fontSize: 12,
+                                        fontWeight: 600, padding: '7px 16px', borderRadius: 8,
+                                        border: '1px solid rgba(255,215,0,0.15)', cursor: 'pointer',
+                                      }}
+                                    >
+                                      + Adicionar Bot
+                                    </button>
+                                  </div>
+                                ) : botList.map((bot, i) => (
+                                  <div key={bot.id} style={{
+                                    display: 'flex', alignItems: 'center', gap: 10,
+                                    padding: '10px 16px',
+                                    borderBottom: i < botList.length - 1 ? '1px solid #141414' : 'none',
+                                    background: '#0a0a0a',
+                                  }}>
+                                    <div style={{
+                                      width: 24, height: 24, borderRadius: 6,
+                                      background: 'rgba(255,215,0,0.07)', border: '1px solid rgba(255,215,0,0.1)',
+                                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                                    }}>
+                                      <Bot size={12} style={{ color: '#FFD700' }} />
+                                    </div>
+                                    <span style={{ color: '#bbb', fontSize: 13, fontWeight: 500, flex: 1, minWidth: 0 }}>{bot.name}</span>
+                                    <span style={{ color: '#2a2a2a', fontSize: 11, fontFamily: 'monospace', flexShrink: 0 }}>{bot.slug}</span>
+                                    <span style={{
+                                      fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 5, flexShrink: 0,
+                                      background: bot.active ? 'rgba(74,222,128,0.08)' : 'rgba(239,68,68,0.08)',
+                                      color: bot.active ? '#4ade80' : '#ef4444',
+                                      border: bot.active ? '1px solid rgba(74,222,128,0.2)' : '1px solid rgba(239,68,68,0.2)',
+                                    }}>
+                                      {bot.active ? 'Ativo' : 'Inativo'}
+                                    </span>
+                                    <div style={{ display: 'flex', gap: 1, flexShrink: 0 }}>
+                                      <ActionBtn
+                                        onClick={() => setModal({ type: 'bot', data: bot, expertId: expert.id, clientId: client.id })}
+                                        title="Editar Bot"
+                                        icon={Pencil}
+                                        hoverColor="#FFD700"
+                                      />
+                                      <ActionBtn
+                                        onClick={() => handleDeleteBot(bot, expert.id)}
+                                        title="Excluir Bot"
+                                        icon={Trash2}
+                                        hoverColor="#ef4444"
+                                      />
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
                             )}
                           </div>
-                        )}
-                      </div>
-                    ))}
-                    {experts[client.id]?.length === 0 && (
-                      <p className="text-gray-700 text-xs px-6 py-3">Nenhum expert. Clique em + para adicionar.</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
       </div>

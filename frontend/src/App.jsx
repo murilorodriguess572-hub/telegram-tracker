@@ -17,17 +17,19 @@ function PrivateRoute({ children, superOnly }) {
   )
   if (!user) return <Navigate to="/login" replace />
   if (superOnly && user.role !== 'superadmin') return <Navigate to="/" replace />
+  if (!superOnly && user.role === 'admin' && user.clientId && window.location.pathname === '/') {
+    return <Navigate to={`/client/${user.clientId}`} replace />
+  }
   return children
 }
 
 function AppRoutes() {
-  const { user } = useAuth()
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/" element={
         <PrivateRoute>
-          {user?.role === 'superadmin' ? <Overview /> : <Navigate to={`/client/${user?.clientId}`} replace />}
+          <Overview />
         </PrivateRoute>
       } />
       <Route path="/clients" element={<PrivateRoute superOnly><Overview /></PrivateRoute>} />
