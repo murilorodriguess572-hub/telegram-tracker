@@ -200,6 +200,8 @@ async function handleChatMember(client, clientId, chatMember) {
     const eventType = days < 1 ? "coldLeads" : days >= hotLeadDays ? "hotLeads" : "exited";
 
     await db.saveEvent(clientId, eventType, { ...userData, daysInGroup: days });
+    // Salva também como exitedTotal para contagem geral de saídas do canal
+    await db.saveEvent(clientId, "exitedTotal", { ...userData, daysInGroup: days });
     console.log(`[SAÍDA] ${clientId} | ${user.first_name} | ${days.toFixed(1)}d | ${eventType}`);
     await sendCapiEvent(client, client.events.exitedGroup, userData, { days_in_group: days });
   }

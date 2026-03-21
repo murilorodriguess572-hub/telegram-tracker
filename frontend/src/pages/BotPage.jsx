@@ -11,7 +11,7 @@ import FunnelChart from '../components/Charts/FunnelChart'
 import HeatmapChart from '../components/Charts/HeatmapChart'
 import api from '../lib/api'
 import IntegrationScript from '../components/UI/IntegrationScript'
-import { Users, TrendingUp, Flame, MousePointer, Clock, Activity } from 'lucide-react'
+import { Users, TrendingUp, Flame, MousePointer, Clock, Activity, LogOut } from 'lucide-react'
 
 function Section({ title, children }) {
   return (
@@ -72,12 +72,18 @@ export default function BotPage() {
           <DateFilter onChange={({ start, end }) => { setStartDate(start); setEndDate(end) }} defaultPreset="7d" />
         </div>
 
-        {loading ? <LoadingSkeleton cards={4} /> : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {loading ? <LoadingSkeleton cards={5} /> : (
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             <MetricCard label="Page Views" value={counts.pageviews} icon={Users} color="#3b82f6" />
             <MetricCard label="Entradas" value={counts.entered} icon={TrendingUp} color="#FFD700" />
             <MetricCard label="Hot Leads" value={counts.hotLeads} icon={Flame} color="#f97316" />
             <MetricCard label="Cliques Casa" value={counts.betClicks} icon={MousePointer} color="#22c55e" />
+            <MetricCard
+              label="Saídas Totais"
+              value={counts.exitedTotal ?? ((counts.coldLeads || 0) + (counts.exited || 0) + (counts.hotLeads || 0))}
+              icon={LogOut}
+              color="#ef4444"
+            />
           </div>
         )}
 
