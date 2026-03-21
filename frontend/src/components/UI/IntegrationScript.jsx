@@ -20,6 +20,7 @@ export default function IntegrationScript({ botSlug, appUrl }) {
       style={{ marginTop: 16, border: '1px solid #1e1e1e', borderRadius: 12, overflow: 'hidden', background: '#0d0d0d' }}
     >
       <button
+        type="button"
         onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
         style={{
           width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -48,6 +49,7 @@ export default function IntegrationScript({ botSlug, appUrl }) {
               {script}
             </pre>
             <button
+              type="button"
               onClick={(e) => { e.stopPropagation(); copy() }}
               style={{
                 position: 'absolute', top: 8, right: 8,
