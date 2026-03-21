@@ -17,22 +17,29 @@ function PrivateRoute({ children, superOnly }) {
   )
   if (!user) return <Navigate to="/login" replace />
   if (superOnly && user.role !== 'superadmin') return <Navigate to="/" replace />
-  if (!superOnly && user.role === 'admin' && user.clientId && window.location.pathname === '/') {
-    return <Navigate to={`/client/${user.clientId}`} replace />
-  }
   return children
 }
 
 function AppRoutes() {
+  const { user, loading } = useAuth()
+
+  if (loading) return (
+    <div style={{ minHeight: '100vh', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: 32, height: 32, border: '2px solid #FFD700', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+    </div>
+  )
+
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
+      <Route path="/login" element={!user ? <Login /> : <Navigate to="/" replace />} />
       <Route path="/" element={
         <PrivateRoute>
-          <Overview />
+          {user?.role === 'admin'
+            ? <Navigate to={`/client/${user.clientId}`} replace />
+            : <Overview />
+          }
         </PrivateRoute>
       } />
-      <Route path="/clients" element={<PrivateRoute superOnly><Overview /></PrivateRoute>} />
       <Route path="/client/:id" element={<PrivateRoute><ClientPage /></PrivateRoute>} />
       <Route path="/expert/:id" element={<PrivateRoute><ExpertPage /></PrivateRoute>} />
       <Route path="/bot/:id" element={<PrivateRoute><BotPage /></PrivateRoute>} />

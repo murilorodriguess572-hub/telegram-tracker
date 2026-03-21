@@ -1,247 +1,186 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import PageWrapper from '../components/Layout/PageWrapper'
-import MetricCard from '../components/Cards/MetricCard'
-import DateFilter, { getDateRange } from '../components/UI/DateFilter'
-import LoadingSkeleton from '../components/UI/LoadingSkeleton'
-import CountUp from '../components/UI/CountUp'
-import LineChart from '../components/Charts/LineChart'
 import api from '../lib/api'
-import { TrendingUp, Bot, Building2, Flame, ChevronRight, Zap } from 'lucide-react'
+import { Building2, Bot, TrendingUp, ChevronRight, LogOut } from 'lucide-react'
 
-// ── Agrega entradas por dia somando todos os bots ─────────────
-async function fetchLineData(bots, days = 7) {
-  const tz = 'America/Sao_Paulo'
-  const today = new Date().toLocaleDateString('en-CA', { timeZone: tz })
-  const from  = new Date(); from.setDate(from.getDate() - (days - 1))
-  const start = from.toLocaleDateString('en-CA', { timeZone: tz })
-
-  const dayMap = {}
-  await Promise.all(
-    bots.map(async (bot) => {
-      try {
-        const m = await api.get(`/metrics/${bot.slug}?start=${start}&end=${today}&days=${days}`)
-        ;(m.byDay || []).forEach(row => {
-          dayMap[row.dia] = (dayMap[row.dia] || 0) + Number(row.total)
-        })
-      } catch {}
-    })
+function StatusDot({ ok }) {
+  return (
+    <span style={{
+      display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
+      background: ok ? '#22c55e' : '#ef4444',
+      boxShadow: ok ? '0 0 6px #22c55e88' : '0 0 6px #ef444488',
+      flexShrink: 0,
+    }} />
   )
-
-  // Garante todos os dias no range, mesmo sem dados
-  const result = []
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(); d.setDate(d.getDate() - i)
-    const key = d.toLocaleDateString('en-CA', { timeZone: tz })
-    const label = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: tz })
-    result.push({ dia: label, total: dayMap[key] || 0 })
-  }
-  return result
 }
 
-function ClientRow({ client }) {
+function BotStatusInline({ botId }) {
+  const [status, setStatus] = useState(null)
+  useEffect(() => {
+    api.get(`/bot-status/${botId}`).then(setStatus).catch(() => {})
+  }, [botId])
+  if (!status) return <span style={{ color: '#444', fontSize: 11 }}>verificando...</span>
+  const ok = status?.webhook?.connected && status?.chat?.connected
   return (
-    <Link
-      to={`/client/${client.id}`}
-      className="flex items-center gap-4 px-5 py-4 transition-colors group"
-      style={{ borderBottom: '1px solid #141414' }}
-      onMouseEnter={e => e.currentTarget.style.background = '#111'}
-      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-    >
-      <div
-        className="flex items-center justify-center rounded-xl flex-shrink-0"
-        style={{ width: 36, height: 36, background: 'rgba(255,215,0,0.07)', border: '1px solid rgba(255,215,0,0.12)' }}
-      >
-        <Building2 size={16} style={{ color: '#FFD700' }} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-white font-medium text-sm">{client.name}</p>
-        <p className="text-gray-600 text-xs mt-0.5">{client.botsCount} {client.botsCount === 1 ? 'bot' : 'bots'}</p>
-      </div>
-      <div className="flex items-center gap-8 text-right mr-2">
-        <div>
-          <p className="text-white text-sm font-semibold"><CountUp end={client.totalEntered || 0} /></p>
-          <p className="text-gray-600 text-[11px]">período</p>
-        </div>
-        <div>
-          <p className="text-sm font-semibold" style={{ color: '#4ade80' }}><CountUp end={client.totalToday || 0} /></p>
-          <p className="text-gray-600 text-[11px]">hoje</p>
-        </div>
-      </div>
-      <ChevronRight size={14} className="text-gray-700 group-hover:text-[#FFD700] transition-colors flex-shrink-0" />
-    </Link>
+    <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: ok ? '#22c55e' : '#ef4444' }}>
+      <StatusDot ok={ok} />
+      {ok ? 'Conectado' : (status?.webhook?.lastError || status?.chat?.error || 'Problema')}
+    </span>
   )
 }
 
 export default function Overview() {
-  const [data,      setData]      = useState(null)
-  const [lineData,  setLineData]  = useState([])
-  const [loading,   setLoading]   = useState(true)
-  const [chartLoad, setChartLoad] = useState(true)
-  const [dateRange, setDateRange] = useState(getDateRange('today'))
+  const [clients, setClients] = useState([])
+  const [botsMap, setBotsMap] = useState({})
+  const [metricsMap, setMetricsMap] = useState({})
+  const [loading, setLoading] = useState(true)
+  const [expanded, setExpanded] = useState({})
 
-  const loadAll = useCallback(async () => {
+  const tz = 'America/Sao_Paulo'
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: tz })
+
+  const load = useCallback(async () => {
     setLoading(true)
-    setChartLoad(true)
     try {
-      const overview = await api.get(`/metrics/overview?start=${dateRange.start}&end=${dateRange.end}`)
-      setData(overview)
-      setChartLoad(false)
+      const cls = await api.get('/clients')
+      setClients(cls)
 
-      // Só busca gráfico se houver bots
-      try {
-        const allBots = await api.get('/bots')
-        if (allBots?.length) {
-          setChartLoad(true)
-          const ld = await fetchLineData(allBots, 7)
-          setLineData(ld)
+      for (const client of cls) {
+        const bots = await api.get(`/bots?clientId=${client.id}`)
+        setBotsMap(prev => ({ ...prev, [client.id]: bots }))
+
+        let entered = 0, exited = 0
+        for (const bot of bots) {
+          try {
+            const m = await api.get(`/metrics/${bot.slug}?start=${today}&end=${today}`)
+            entered += m.counts?.entered || 0
+            exited += (m.counts?.exitedTotal || 0) + (m.counts?.coldLeads || 0) + (m.counts?.exited || 0) + (m.counts?.hotLeads || 0)
+          } catch {}
         }
-      } catch {}
+        setMetricsMap(prev => ({ ...prev, [client.id]: { entered, exited } }))
+      }
     } catch (e) { console.error(e) }
-    finally { setLoading(false); setChartLoad(false) }
-  }, [dateRange])
+    finally { setLoading(false) }
+  }, [])
 
-  useEffect(() => { loadAll() }, [loadAll])
+  useEffect(() => { load() }, [load])
 
-  const totalEntered = data?.clients?.reduce((s, c) => s + (c.totalEntered || 0), 0) || 0
-  const totalToday   = data?.clients?.reduce((s, c) => s + (c.totalToday   || 0), 0) || 0
-  const totalBots    = data?.clients?.reduce((s, c) => s + (c.botsCount    || 0), 0) || 0
-  const totalClients = data?.total || 0
+  const totalClients = clients.length
+  const totalBots = Object.values(botsMap).reduce((s, b) => s + b.length, 0)
+  const totalEntered = Object.values(metricsMap).reduce((s, m) => s + m.entered, 0)
+  const totalExited = Object.values(metricsMap).reduce((s, m) => s + m.exited, 0)
 
   return (
-    <PageWrapper onRefresh={loadAll} loading={loading}>
-      <div className="space-y-6" style={{ maxWidth: 1100 }}>
+    <PageWrapper onRefresh={load} loading={loading}>
+      <div style={{ maxWidth: 1000 }}>
 
-        {/* Cabeçalho */}
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-white font-bold tracking-tight" style={{ fontSize: 28 }}>
-              Visão Geral
-            </h1>
-            <p className="text-gray-500 text-sm mt-1">Resumo de todos os clientes e bots</p>
-          </div>
-          <DateFilter onChange={setDateRange} />
+        {/* Header */}
+        <div style={{ marginBottom: 28 }}>
+          <h1 style={{ color: '#fff', fontWeight: 700, fontSize: 26, margin: 0 }}>Visão Geral</h1>
+          <p style={{ color: '#444', fontSize: 13, marginTop: 4 }}>
+            Monitoramento em tempo real — {new Date().toLocaleDateString('pt-BR', { timeZone: tz, weekday: 'long', day: '2-digit', month: 'long' })}
+          </p>
         </div>
 
-        {/* Cards */}
-        {loading ? <LoadingSkeleton cards={4} /> : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <MetricCard label="Clientes"          value={totalClients} icon={Building2}  color="#FFD700" />
-            <MetricCard label="Bots Ativos"        value={totalBots}    icon={Bot}         color="#60a5fa" />
-            <MetricCard label="Entradas (período)" value={totalEntered} icon={TrendingUp}  color="#FFD700" />
-            <MetricCard label="Entradas Hoje"      value={totalToday}   icon={Flame}       color="#fb923c" />
-          </div>
-        )}
-
-        {/* Gráfico + Resumo */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-
-          {/* Gráfico linha */}
-          {lineData.length > 0 ? (
-            <div className="lg:col-span-2 rounded-xl overflow-hidden" style={{ background: '#111', border: '1px solid #1a1a1a' }}>
-              <div className="px-6 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid #1a1a1a' }}>
-                <div>
-                  <p className="text-white font-semibold text-sm">Entradas por dia</p>
-                  <p className="text-gray-600 text-xs mt-0.5">Todos os bots · últimos 7 dias</p>
-                </div>
+        {/* Cards resumo */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 28 }}>
+          {[
+            { label: 'Clientes',      value: totalClients, color: '#FFD700', icon: Building2 },
+            { label: 'Bots',          value: totalBots,    color: '#60a5fa', icon: Bot },
+            { label: 'Entradas hoje', value: totalEntered, color: '#4ade80', icon: TrendingUp },
+            { label: 'Saídas hoje',   value: totalExited,  color: '#f87171', icon: LogOut },
+          ].map(({ label, value, color, icon: Icon }) => (
+            <div key={label} style={{ background: '#111', border: '1px solid #1a1a1a', borderRadius: 12, padding: '16px 20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <Icon size={15} style={{ color }} />
+                <span style={{ color: '#555', fontSize: 12 }}>{label}</span>
               </div>
-              <div className="px-4 pb-4 pt-2">
-                {chartLoad ? (
-                  <div className="rounded-lg skeleton" style={{ height: 200 }} />
-                ) : (
-                  <LineChart data={lineData} lines={[{ dataKey: 'total', name: 'Entradas', color: '#FFD700' }]} height={200} />
+              <p style={{ color, fontWeight: 800, fontSize: 28, margin: 0 }}>
+                {loading ? '—' : value}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        {/* Lista de clientes com bots */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {clients.length === 0 && !loading && (
+            <div style={{ background: '#111', border: '1px solid #1a1a1a', borderRadius: 14, padding: '48px 24px', textAlign: 'center' }}>
+              <p style={{ color: '#fff', fontWeight: 600, fontSize: 16, marginBottom: 8 }}>Nenhum cliente ainda</p>
+              <p style={{ color: '#444', fontSize: 13, marginBottom: 20 }}>Comece criando seu primeiro cliente nas configurações.</p>
+              <Link to="/settings" style={{ background: '#FFD700', color: '#000', fontWeight: 700, fontSize: 13, padding: '10px 24px', borderRadius: 8, textDecoration: 'none' }}>
+                Ir para Configurações →
+              </Link>
+            </div>
+          )}
+
+          {clients.map(client => {
+            const bots = botsMap[client.id] || []
+            const metrics = metricsMap[client.id] || { entered: 0, exited: 0 }
+            const isOpen = expanded[client.id]
+
+            return (
+              <div key={client.id} style={{ background: '#111', border: '1px solid #1a1a1a', borderRadius: 14, overflow: 'hidden' }}>
+                {/* Client header */}
+                <div
+                  onClick={() => setExpanded(p => ({ ...p, [client.id]: !isOpen }))}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', cursor: 'pointer', background: isOpen ? '#141414' : '#111' }}
+                >
+                  <Building2 size={16} style={{ color: '#FFD700', flexShrink: 0 }} />
+                  <span style={{ color: '#fff', fontWeight: 600, fontSize: 14, flex: 1 }}>{client.name}</span>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginRight: 12 }}>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ color: '#4ade80', fontWeight: 700, fontSize: 16, margin: 0 }}>{loading ? '—' : metrics.entered}</p>
+                      <p style={{ color: '#444', fontSize: 10, margin: 0 }}>entradas hoje</p>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ color: '#f87171', fontWeight: 700, fontSize: 16, margin: 0 }}>{loading ? '—' : metrics.exited}</p>
+                      <p style={{ color: '#444', fontSize: 10, margin: 0 }}>saídas hoje</p>
+                    </div>
+                    <span style={{ color: '#555', fontSize: 11, background: '#1a1a1a', padding: '2px 8px', borderRadius: 5 }}>
+                      {bots.length} bots
+                    </span>
+                  </div>
+
+                  <Link
+                    to={`/client/${client.id}`}
+                    onClick={e => e.stopPropagation()}
+                    style={{ color: '#FFD700', fontSize: 11, fontWeight: 600, textDecoration: 'none', background: 'rgba(255,215,0,0.08)', padding: '4px 10px', borderRadius: 6, flexShrink: 0 }}
+                  >
+                    Ver →
+                  </Link>
+
+                  <ChevronRight size={14} style={{ color: '#333', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }} />
+                </div>
+
+                {/* Bots list */}
+                {isOpen && (
+                  <div style={{ borderTop: '1px solid #1a1a1a' }}>
+                    {bots.length === 0 && (
+                      <p style={{ color: '#444', fontSize: 12, padding: '12px 20px' }}>Nenhum bot cadastrado.</p>
+                    )}
+                    {bots.map(bot => (
+                      <Link
+                        key={bot.id}
+                        to={`/bot/${bot.id}`}
+                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px 10px 36px', borderBottom: '1px solid #141414', textDecoration: 'none', background: 'transparent' }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#0d0d0d'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <Bot size={13} style={{ color: '#FFD700', flexShrink: 0 }} />
+                        <span style={{ color: '#ccc', fontSize: 12, flex: 1 }}>{bot.name}</span>
+                        <span style={{ color: '#333', fontSize: 10, fontFamily: 'monospace' }}>{bot.slug}</span>
+                        <BotStatusInline botId={bot.id} />
+                        <ChevronRight size={12} style={{ color: '#333' }} />
+                      </Link>
+                    ))}
+                  </div>
                 )}
               </div>
-            </div>
-          ) : (
-            <div className="lg:col-span-2 rounded-xl flex flex-col items-center justify-center gap-3 p-10"
-              style={{ background: '#111', border: '1px solid #1a1a1a', minHeight: 260 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 14, background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <TrendingUp size={22} style={{ color: '#FFD700' }} />
-              </div>
-              <p className="text-white font-semibold text-sm">Nenhum dado ainda</p>
-              <p className="text-gray-500 text-xs text-center" style={{ maxWidth: 260 }}>
-                Configure bots nos seus clientes para começar a ver entradas por dia aqui.
-              </p>
-              <a href="/settings" style={{ marginTop: 4, background: '#FFD700', color: '#000', fontWeight: 700, fontSize: 12, padding: '8px 20px', borderRadius: 8, textDecoration: 'none' }}>
-                Ir para Configurações
-              </a>
-            </div>
-          )}
-
-          {/* Resumo lateral */}
-          <div className="rounded-xl overflow-hidden" style={{ background: '#111', border: '1px solid #1a1a1a' }}>
-            <div className="px-6 py-4" style={{ borderBottom: '1px solid #1a1a1a' }}>
-              <p className="text-white font-semibold text-sm">Resumo do período</p>
-            </div>
-            <div className="px-6 py-5 space-y-4">
-              {[
-                { label: 'Clientes',          value: totalClients, color: '#FFD700' },
-                { label: 'Bots configurados', value: totalBots,    color: '#60a5fa' },
-                { label: 'Total de entradas', value: totalEntered, color: '#FFD700' },
-                { label: 'Entradas hoje',     value: totalToday,   color: '#4ade80' },
-              ].map(({ label, value, color }) => (
-                <div key={label} className="flex items-center justify-between">
-                  <span className="text-gray-500 text-sm">{label}</span>
-                  <span className="font-bold text-sm" style={{ color }}>
-                    {loading ? '—' : <CountUp end={value} />}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Lista de clientes */}
-        <div className="rounded-xl overflow-hidden" style={{ background: '#0d0d0d', border: '1px solid #1a1a1a' }}>
-          <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid #1a1a1a' }}>
-            <p className="text-white font-semibold text-sm">Clientes</p>
-            <Link
-              to="/settings"
-              className="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
-              style={{ color: '#FFD700', background: 'rgba(255,215,0,0.07)' }}
-            >
-              + Novo cliente
-            </Link>
-          </div>
-
-          {loading ? (
-            <div className="p-5 space-y-3">
-              {[1, 2, 3].map(i => <div key={i} className="h-14 rounded-xl skeleton" />)}
-            </div>
-          ) : data?.clients?.length === 0 ? (
-            <div style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'center',
-              justifyContent: 'center', padding: '60px 20px', gap: 16,
-            }}>
-              <div style={{
-                width: 56, height: 56, borderRadius: 16,
-                background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.15)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <Zap size={24} style={{ color: '#FFD700' }} />
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <p style={{ color: '#fff', fontWeight: 700, fontSize: 18, marginBottom: 8 }}>
-                  Bem-vindo ao Expert Tracking!
-                </p>
-                <p style={{ color: '#555', fontSize: 14, maxWidth: 360, lineHeight: 1.6 }}>
-                  Comece criando seu primeiro cliente e configurando os bots de rastreamento.
-                </p>
-              </div>
-              <a href="/settings" style={{
-                background: '#FFD700', color: '#000', fontWeight: 700, fontSize: 14,
-                padding: '12px 28px', borderRadius: 10, textDecoration: 'none',
-                boxShadow: '0 4px 20px rgba(255,215,0,0.25)',
-              }}>
-                Criar primeiro cliente →
-              </a>
-            </div>
-          ) : (
-            <div>
-              {data.clients.map(client => <ClientRow key={client.id} client={client} />)}
-            </div>
-          )}
+            )
+          })}
         </div>
 
       </div>
