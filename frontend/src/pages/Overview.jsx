@@ -7,7 +7,7 @@ import LoadingSkeleton from '../components/UI/LoadingSkeleton'
 import CountUp from '../components/UI/CountUp'
 import LineChart from '../components/Charts/LineChart'
 import api from '../lib/api'
-import { TrendingUp, Bot, Building2, Flame, ChevronRight } from 'lucide-react'
+import { TrendingUp, Bot, Building2, Flame, ChevronRight, Zap } from 'lucide-react'
 
 // ── Agrega entradas por dia somando todos os bots ─────────────
 async function fetchLineData(bots, days = 7) {
@@ -210,11 +210,32 @@ export default function Overview() {
               {[1, 2, 3].map(i => <div key={i} className="h-14 rounded-xl skeleton" />)}
             </div>
           ) : data?.clients?.length === 0 ? (
-            <div className="py-10 text-center">
-              <p className="text-gray-500 text-sm mb-2">Nenhum cliente cadastrado ainda</p>
-              <Link to="/settings" className="text-sm hover:underline" style={{ color: '#FFD700' }}>
-                Ir para Configurações →
-              </Link>
+            <div style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              justifyContent: 'center', padding: '60px 20px', gap: 16,
+            }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: 16,
+                background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.15)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Zap size={24} style={{ color: '#FFD700' }} />
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ color: '#fff', fontWeight: 700, fontSize: 18, marginBottom: 8 }}>
+                  Bem-vindo ao Expert Tracking!
+                </p>
+                <p style={{ color: '#555', fontSize: 14, maxWidth: 360, lineHeight: 1.6 }}>
+                  Comece criando seu primeiro cliente e configurando os bots de rastreamento.
+                </p>
+              </div>
+              <a href="/settings" style={{
+                background: '#FFD700', color: '#000', fontWeight: 700, fontSize: 14,
+                padding: '12px 28px', borderRadius: 10, textDecoration: 'none',
+                boxShadow: '0 4px 20px rgba(255,215,0,0.25)',
+              }}>
+                Criar primeiro cliente →
+              </a>
             </div>
           ) : (
             <div>
