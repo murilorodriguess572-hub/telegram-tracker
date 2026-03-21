@@ -21,6 +21,7 @@ export default function Account() {
   const [tab, setTab] = useState('profile')
   const [editingName, setEditingName] = useState(false)
   const [name, setName] = useState(user?.name || '')
+  const [email, setEmail] = useState(user?.email || '')
   const [nameLoading, setNameLoading] = useState(false)
   const [nameMsg, setNameMsg] = useState(null)
 
@@ -30,14 +31,16 @@ export default function Account() {
   const [passLoading, setPassLoading] = useState(false)
   const [passMsg, setPassMsg] = useState(null)
 
-  const handleSaveName = async () => {
+  const handleSaveProfile = async () => {
     if (!name.trim()) return
     setNameLoading(true); setNameMsg(null)
     try {
-      setNameMsg({ type: 'success', text: 'Nome atualizado!' })
+      await api.put('/auth/profile', { name: name.trim(), email: email.trim() })
+      setNameMsg({ type: 'success', text: 'Perfil atualizado com sucesso!' })
       setEditingName(false)
-    } catch {
-      setNameMsg({ type: 'error', text: 'Erro ao salvar' })
+      window.location.reload()
+    } catch (err) {
+      setNameMsg({ type: 'error', text: err.error || 'Erro ao salvar' })
     } finally { setNameLoading(false) }
   }
 
@@ -123,10 +126,10 @@ export default function Account() {
                 </button>
               ) : (
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <button onClick={() => { setEditingName(false); setName(user?.name || '') }} style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', color: '#aaa', fontSize: 12, padding: '6px 12px', borderRadius: 8, cursor: 'pointer' }}>
+                  <button onClick={() => { setEditingName(false); setName(user?.name || ''); setEmail(user?.email || '') }} style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', color: '#aaa', fontSize: 12, padding: '6px 12px', borderRadius: 8, cursor: 'pointer' }}>
                     <X size={13} />
                   </button>
-                  <button onClick={handleSaveName} disabled={nameLoading} style={{ background: '#FFD700', border: 'none', color: '#000', fontSize: 12, fontWeight: 700, padding: '6px 14px', borderRadius: 8, cursor: 'pointer' }}>
+                  <button onClick={handleSaveProfile} disabled={nameLoading} style={{ background: '#FFD700', border: 'none', color: '#000', fontSize: 12, fontWeight: 700, padding: '6px 14px', borderRadius: 8, cursor: 'pointer' }}>
                     <Check size={13} />
                   </button>
                 </div>
@@ -156,9 +159,16 @@ export default function Account() {
               </div>
               <div>
                 <label style={{ display: 'block', color: '#666', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 7 }}>
-                  Email <span style={{ color: '#333', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(não editável)</span>
+                  Email
                 </label>
-                <input value={user?.email || ''} disabled style={{ ...inputStyle, opacity: 0.5, cursor: 'default' }} />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  disabled={!editingName}
+                  style={{ ...inputStyle, opacity: editingName ? 1 : 0.6, cursor: editingName ? 'text' : 'default' }}
+                  {...(editingName ? inputFocus : {})}
+                />
               </div>
             </div>
           </div>

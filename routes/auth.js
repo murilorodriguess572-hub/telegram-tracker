@@ -46,4 +46,25 @@ router.post("/change-password", authMiddleware, async (req, res) => {
   res.json({ ok: true });
 });
 
+// PUT /api/auth/profile
+router.put("/profile", authMiddleware, async (req, res) => {
+  const { name, email } = req.body;
+  if (!name && !email) return res.status(400).json({ error: "Nada para atualizar" });
+
+  if (email) {
+    const conflict = await db.getUserByEmail(email.toLowerCase());
+    if (conflict && conflict.id !== req.user.id)
+      return res.status(400).json({ error: "Email já está em uso" });
+  }
+
+  await db.updateUserEmailAndName(
+    req.user.id,
+    name || req.user.name,
+    email ? email.toLowerCase() : req.user.email
+  );
+
+  const updated = await db.getUserById(req.user.id);
+  res.json({ ...updated, clientId: updated.client_id });
+});
+
 module.exports = router;
