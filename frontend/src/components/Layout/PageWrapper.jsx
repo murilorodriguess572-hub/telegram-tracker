@@ -12,7 +12,7 @@ export default function PageWrapper({ children, onRefresh, loading, refreshing }
         style={{ marginLeft: SIDEBAR_W }}
       >
         <TopBar onRefresh={onRefresh} loading={loading || refreshing} />
-        <main className="flex-1 overflow-y-auto" style={{ padding: '28px 32px' }}>
+        <main className="flex-1 overflow-y-auto" style={{ padding: '24px 32px' }}>
           {children}
         </main>
       </div>

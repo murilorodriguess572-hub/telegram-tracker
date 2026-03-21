@@ -1,5 +1,6 @@
 import { useLocation, Link } from 'react-router-dom'
 import { ChevronRight, RefreshCw } from 'lucide-react'
+import { useState } from 'react'
 
 const labels = {
   '': 'Overview', 'clients': 'Clientes', 'client': 'Cliente',
@@ -9,12 +10,13 @@ const labels = {
 export default function TopBar({ onRefresh, loading }) {
   const location = useLocation()
   const parts = location.pathname.split('/').filter(Boolean)
+  const [btnHover, setBtnHover] = useState(false)
 
   const crumbs = [
     { label: 'Início', to: '/' },
     ...parts
-      .filter(p => isNaN(p)) // oculta IDs numéricos
-      .map((part, i) => ({
+      .filter(p => isNaN(p))
+      .map((part) => ({
         label: labels[part] || part,
         to: '/' + parts.slice(0, parts.indexOf(part) + 1).join('/'),
       })),
@@ -22,16 +24,26 @@ export default function TopBar({ onRefresh, loading }) {
 
   return (
     <header
-      className="flex items-center justify-between px-6 shrink-0"
-      style={{ height: 52, borderBottom: '1px solid #1a1a1a', background: '#0a0a0a' }}
+      style={{
+        height: 52, borderBottom: '1px solid #1a1a1a', background: '#0a0a0a',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 32px', flexShrink: 0,
+      }}
     >
-      <nav className="flex items-center gap-1.5 text-sm">
+      <nav style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         {crumbs.map((crumb, i) => (
-          <span key={i} className="flex items-center gap-1.5">
-            {i > 0 && <ChevronRight size={13} className="text-gray-700" />}
+          <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {i > 0 && <ChevronRight size={12} style={{ color: '#333' }} />}
             {i === crumbs.length - 1
-              ? <span className="text-white font-medium">{crumb.label}</span>
-              : <Link to={crumb.to} className="text-gray-600 hover:text-gray-400 transition-colors">{crumb.label}</Link>
+              ? <span style={{ color: '#fff', fontWeight: 500, fontSize: 13 }}>{crumb.label}</span>
+              : <Link
+                  to={crumb.to}
+                  style={{ color: '#555', fontSize: 13, textDecoration: 'none', transition: 'color 0.15s' }}
+                  onMouseEnter={e => e.target.style.color = '#888'}
+                  onMouseLeave={e => e.target.style.color = '#555'}
+                >
+                  {crumb.label}
+                </Link>
             }
           </span>
         ))}
@@ -40,9 +52,18 @@ export default function TopBar({ onRefresh, loading }) {
       {onRefresh && (
         <button
           onClick={onRefresh}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs text-gray-500 hover:text-white hover:bg-white/5 transition-all"
+          onMouseEnter={() => setBtnHover(true)}
+          onMouseLeave={() => setBtnHover(false)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '7px 14px', borderRadius: 8,
+            border: `1px solid ${btnHover ? '#333' : '#1e1e1e'}`,
+            background: '#141414', color: btnHover ? '#fff' : '#666',
+            fontSize: 12, fontWeight: 500, cursor: 'pointer',
+            transition: 'all 0.15s',
+          }}
         >
-          <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+          <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
           Atualizar
         </button>
       )}
