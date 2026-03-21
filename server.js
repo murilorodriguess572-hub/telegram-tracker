@@ -199,9 +199,18 @@ async function handleChatMember(client, clientId, chatMember) {
     const hotLeadDays = client.hotLeadDays || 3;
     const eventType = days < 1 ? "coldLeads" : days >= hotLeadDays ? "hotLeads" : "exited";
 
+    // Saída categorizada por bot (frio/morno/quente)
     await db.saveEvent(clientId, eventType, { ...userData, daysInGroup: days });
-    // Salva também como exitedTotal para contagem geral de saídas do canal
+
+    // Saída total do CANAL (independente do bot)
     await db.saveEvent(clientId, "exitedTotal", { ...userData, daysInGroup: days });
+
+    // Saída do lead que entrou POR ESTE BOT (retenção por bot)
+    const visitorBot = await db.getVisitorBot(user.id, clientId);
+    if (visitorBot) {
+      await db.saveEvent(clientId, "exitedByBot", { ...userData, daysInGroup: days });
+    }
+
     console.log(`[SAÍDA] ${clientId} | ${user.first_name} | ${days.toFixed(1)}d | ${eventType}`);
     await sendCapiEvent(client, client.events.exitedGroup, userData, { days_in_group: days });
   }

@@ -17,9 +17,7 @@ export default function ExpertPage() {
   const fetchRef = useRef(0)
   const tz = 'America/Sao_Paulo'
   const today = new Date().toLocaleDateString('en-CA', { timeZone: tz })
-  const sevenDaysAgo = new Date()
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6)
-  const [startDate, setStartDate] = useState(sevenDaysAgo.toLocaleDateString('en-CA', { timeZone: tz }))
+  const [startDate, setStartDate] = useState(today)
   const [endDate, setEndDate] = useState(today)
 
   const fetchData = async (start, end) => {
@@ -56,7 +54,7 @@ export default function ExpertPage() {
             <h1 className="text-white text-2xl font-bold">{data?.expert?.name || 'Carregando...'}</h1>
             <p className="text-gray-500 text-sm mt-0.5">{data?.bots?.length || 0} bots</p>
           </div>
-          <DateFilter onChange={({ start, end }) => { setStartDate(start); setEndDate(end) }} defaultPreset="7d" />
+          <DateFilter onChange={({ start, end }) => { setStartDate(start); setEndDate(end) }} defaultPreset="today" />
         </div>
 
         {loading ? <LoadingSkeleton cards={4} /> : (

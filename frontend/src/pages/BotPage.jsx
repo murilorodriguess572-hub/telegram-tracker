@@ -33,9 +33,7 @@ export default function BotPage() {
   const fetchRef = useRef(0)
   const tz = 'America/Sao_Paulo'
   const today = new Date().toLocaleDateString('en-CA', { timeZone: tz })
-  const sevenDaysAgo = new Date()
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6)
-  const [startDate, setStartDate] = useState(sevenDaysAgo.toLocaleDateString('en-CA', { timeZone: tz }))
+  const [startDate, setStartDate] = useState(today)
   const [endDate, setEndDate] = useState(today)
 
   const fetchData = async (start, end) => {
@@ -69,7 +67,7 @@ export default function BotPage() {
             <h1 className="text-white text-2xl font-bold">{botInfo?.name || 'Bot'}</h1>
             <p className="text-gray-600 text-xs font-mono mt-0.5">{botInfo?.slug}</p>
           </div>
-          <DateFilter onChange={({ start, end }) => { setStartDate(start); setEndDate(end) }} defaultPreset="7d" />
+          <DateFilter onChange={({ start, end }) => { setStartDate(start); setEndDate(end) }} defaultPreset="today" />
         </div>
 
         {loading ? <LoadingSkeleton cards={5} /> : (
@@ -78,12 +76,7 @@ export default function BotPage() {
             <MetricCard label="Entradas" value={counts.entered} icon={TrendingUp} color="#FFD700" />
             <MetricCard label="Hot Leads" value={counts.hotLeads} icon={Flame} color="#f97316" />
             <MetricCard label="Cliques Casa" value={counts.betClicks} icon={MousePointer} color="#22c55e" />
-            <MetricCard
-              label="Saídas Totais"
-              value={counts.exitedTotal ?? ((counts.coldLeads || 0) + (counts.exited || 0) + (counts.hotLeads || 0))}
-              icon={LogOut}
-              color="#ef4444"
-            />
+            <MetricCard label="Saíram pelo Bot" value={counts.exitedByBot || 0} icon={LogOut} color="#f97316" />
           </div>
         )}
 
